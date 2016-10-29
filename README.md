@@ -1,6 +1,9 @@
 # WhatsappTray
 Minimize Whatsapp Desktop-Client to Tray
 
+Requirements:
+Intalled Whatsapp-Desktop-Client. Download from here: https://www.whatsapp.com/download/
+
 Using:
 Start the WhatsappTray.exe and from this Point on the Minimize-Button in the Whatsapp-Client sends the Apllication to the Tray.
 
