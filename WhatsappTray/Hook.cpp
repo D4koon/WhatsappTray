@@ -40,7 +40,14 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 		{
 			if (msg->wParam == 61472)
 			{
-				PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)msg->hwnd);
+				// Ich prüfe hier noch ob der Fenstertitel übereinstimmt. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
+				// Ich könnte hier auch noch die klasse checken, das hat dann den vorteil, das es noch genauer ist.
+				// Sollte die Klasse von Whatsapp aus aber umbenannt werden muss ich hier wieder nachbesser.
+				// -> Daher lass ichs erstmal so...
+				if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME))
+				{
+					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)msg->hwnd);
+				}
 			}
 		}
 

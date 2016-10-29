@@ -1,4 +1,5 @@
 #define NAME L"WhatsappTrayHook"
+#define WHATSAPP_CLIENT_NAME L"WhatsApp"
 
 #define WM_ADDTRAY  0x0401
 #define WM_REMTRAY  0x0402
