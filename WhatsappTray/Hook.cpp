@@ -49,6 +49,40 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 	return CallNextHookEx(_hWndProc, nCode, wParam, lParam);
 }
 
+LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam) {
+	if (nCode >= 0) {
+		CWPRETSTRUCT *msg = (CWPRETSTRUCT*)lParam;
+
+		if (msg->hwnd == (HWND)0x10404)
+		{
+			if (msg->message == WM_SYSCOMMAND)
+			{
+				std::ostringstream filename2;
+				filename2 << "C:/hooktest/HWND_" << msg->hwnd << ".txt";
+
+				std::ofstream myfile;
+				myfile.open(filename2.str().c_str(), std::ios::app);
+
+				myfile << "\nWM_SYSCOMMAND (" << msg->message << ")" << msg->wParam;
+
+				if (msg->wParam == 61472)
+				{
+					myfile << "\nMinimize";
+					myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
+
+					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)msg->hwnd);
+					//PostMessage(FindWindow(NAME, NAME), WM_REFRTRAY, 0, (LPARAM)msg->hwnd);
+				}
+				myfile.close();
+			}
+
+		}
+
+	}
+
+	return CallNextHookEx(_hWndProc, nCode, wParam, lParam);
+}
+
 BOOL DLLIMPORT RegisterHook(HMODULE hLib)
 {
 	_hWndProc = SetWindowsHookEx(WH_CALLWNDPROCRET, (HOOKPROC)CallWndRetProc, hLib, 0);
