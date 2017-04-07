@@ -9,6 +9,8 @@ Otherwise it will not work because of communicationproblems between the two appl
 Using:
 Start the WhatsappTray.exe and from this Point on the Minimize-Button in the Whatsapp-Client sends the Apllication to the Tray.
 
+If you want your closebutton to also minimize to tray you have to start with --closeToTray
+
 Exiting:
 Right click on the tray icon (Whatsapp must be minimized to tray) and click Exit in the
 popup menu.  Or run WhatsappTray.exe with --exit parameter.
