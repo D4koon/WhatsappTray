@@ -57,7 +57,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "OK",IDOK,75,159,50,14
     ICON            IDI_WHATSAPPTRAY,IDC_STATIC,7,7,20,20
-    LTEXT           "WhatsappTray 1.1\r\nFreeware\r\n\r\nThis program is distributed under the terms of the GNU General Public License.\r\n\r\nCopyright © 1998-2011\r\n\r\nNikolay Redko\r\nhttp://rbtray.sourceforge.net/\r\n\r\nJ.D. Purcell\r\nhttp://www.moitah.net/",IDC_STATIC,34,7,151,108
+    LTEXT           "WhatsappTray 1.2\r\nFreeware\r\n\r\nThis program is distributed under the terms of the GNU General Public License.\r\n\r\nCopyright © 1998-2011\r\n\r\nNikolay Redko\r\nhttp://rbtray.sourceforge.net/\r\n\r\nJ.D. Purcell\r\nhttp://www.moitah.net/",IDC_STATIC,34,7,151,108
     LTEXT           "Sebastian Amann\r\nhttps://github.com/D4koon",IDC_STATIC,34,119,151,25
 END
 
@@ -97,8 +97,8 @@ IDI_WHATSAPPTRAY        ICON                    "WhatsappTray.ico"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,1,0,0
- PRODUCTVERSION 1,1,0,0
+ FILEVERSION 1,2,0,0
+ PRODUCTVERSION 1,2,0,0
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -114,12 +114,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "WhatsappTray"
-            VALUE "FileVersion", "1.1.0.0"
+            VALUE "FileVersion", "1.2.0.0"
             VALUE "InternalName", "WhatsappTray"
             VALUE "LegalCopyright", "Copyright © 1998-2016 Sebastian Amann, Nikolay Redko, J.D. Purcell"
             VALUE "OriginalFilename", "WhatsappTray.exe"
             VALUE "ProductName", "WhatsappTray"
-            VALUE "ProductVersion", "1.1.0.0"
+            VALUE "ProductVersion", "1.2.0.0"
         END
     END
     BLOCK "VarFileInfo"
