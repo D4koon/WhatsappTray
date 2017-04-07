@@ -9,6 +9,7 @@
 #define IDM_CLOSE   0x1002
 #define IDM_EXIT    0x1003
 #define IDM_ABOUT   0x1004
+#define IDM_DUMMY   0x0405
 
 #define DLLIMPORT __declspec(dllexport)
 

@@ -30,6 +30,7 @@ static HMODULE _hLib;
 static HWND _hwndHook;
 static HWND _hwndItems[MAXTRAYITEMS];
 static HWND _hwndForMenu;
+static bool closeToTray;
 
 int FindInTray(HWND hwnd) {
 	for (int i = 0; i < MAXTRAYITEMS; i++) {
@@ -152,6 +153,10 @@ void ExecuteMenu() {
 		MessageBox(NULL, L"Error creating menu.", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return;
 	}
+	if (closeToTray)
+	{
+		AppendMenu(hMenu, MF_STRING, IDM_DUMMY, L"Close to tray active.");
+	}
 	AppendMenu(hMenu, MF_STRING, IDM_ABOUT,   L"About WhatsappTray");
 	AppendMenu(hMenu, MF_STRING, IDM_EXIT,    L"Exit WhatsappTray");
 	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
@@ -253,7 +258,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 	WNDCLASS wc;
 	MSG msg;
 
-	bool closeToTray = strstr(szCmdLine, "--closeToTray");
+	closeToTray = strstr(szCmdLine, "--closeToTray");
 
 	_hInstance = hInstance;
 	_hwndHook = FindWindow(NAME, NAME);
