@@ -193,57 +193,57 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 	{
 		OutputDebugString(L"HookWndProc() - Message Received\n");
 
-		case WM_COMMAND:
-			switch (LOWORD(wParam))
-			{
-				case IDM_RESTORE:
-					RestoreWindowFromTray(_hwndForMenu);
-					break;
-				case IDM_CLOSE:
-					CloseWindowFromTray(_hwndForMenu);
-					break;
-				case IDM_ABOUT:
-					DialogBox(_hInstance, MAKEINTRESOURCE(IDD_ABOUT), _hwndHook, (DLGPROC)AboutDlgProc);
-					break;
-				case IDM_EXIT:
-					SendMessage(_hwndHook, WM_DESTROY, 0, 0);
-					break;
+	case WM_COMMAND:
+		switch (LOWORD(wParam))
+		{
+		case IDM_RESTORE:
+			RestoreWindowFromTray(_hwndForMenu);
+			break;
+		case IDM_CLOSE:
+			CloseWindowFromTray(_hwndForMenu);
+			break;
+		case IDM_ABOUT:
+			DialogBox(_hInstance, MAKEINTRESOURCE(IDD_ABOUT), _hwndHook, (DLGPROC)AboutDlgProc);
+			break;
+		case IDM_EXIT:
+			SendMessage(_hwndHook, WM_DESTROY, 0, 0);
+			break;
+		}
+		break;
+	case WM_ADDTRAY:
+		MinimizeWindowToTray((HWND)lParam);
+		break;
+	case WM_REMTRAY:
+		RestoreWindowFromTray((HWND)lParam);
+		break;
+	case WM_REFRTRAY:
+		RefreshWindowInTray((HWND)lParam);
+		break;
+	case WM_TRAYCMD:
+		switch ((UINT)lParam) {
+		case NIN_SELECT:
+			RestoreWindowFromTray(_hwndItems[wParam]);
+			break;
+		case WM_CONTEXTMENU:
+			_hwndForMenu = _hwndItems[wParam];
+			ExecuteMenu();
+			break;
+		case WM_MOUSEMOVE:
+			RefreshWindowInTray(_hwndItems[wParam]);
+			break;
+		}
+		break;
+	case WM_DESTROY:
+		MessageBox(NULL, L"HookWndProc() WM_DESTROY", L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		for (int i = 0; i < MAXTRAYITEMS; i++) {
+			if (_hwndItems[i]) {
+				RestoreWindowFromTray(_hwndItems[i]);
 			}
-			break;
-		case WM_ADDTRAY:
-			MinimizeWindowToTray((HWND)lParam);
-			break;
-		case WM_REMTRAY:
-			RestoreWindowFromTray((HWND)lParam);
-			break;
-		case WM_REFRTRAY:
-			RefreshWindowInTray((HWND)lParam);
-			break;
-		case WM_TRAYCMD:
-			switch ((UINT)lParam) {
-				case NIN_SELECT:
-					RestoreWindowFromTray(_hwndItems[wParam]);
-					break;
-				case WM_CONTEXTMENU:
-					_hwndForMenu = _hwndItems[wParam];
-					ExecuteMenu();
-					break;
-				case WM_MOUSEMOVE:
-					RefreshWindowInTray(_hwndItems[wParam]);
-					break;
-			}
-			break;
-		case WM_DESTROY:
-			MessageBox(NULL, L"HookWndProc() WM_DESTROY", L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
-			for (int i = 0; i < MAXTRAYITEMS; i++) {
-				if (_hwndItems[i]) {
-					RestoreWindowFromTray(_hwndItems[i]);
-				}
-			}
-			UnRegisterHook();
-			FreeLibrary(_hLib);
-			PostQuitMessage(0);
-			break;
+		}
+		UnRegisterHook();
+		FreeLibrary(_hLib);
+		PostQuitMessage(0);
+		break;
 	}
 
 	return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -252,6 +252,8 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine, int iCmdShow) {
 	WNDCLASS wc;
 	MSG msg;
+
+	bool closeToTray = strstr(szCmdLine, "--closeToTray");
 
 	_hInstance = hInstance;
 	_hwndHook = FindWindow(NAME, NAME);
@@ -268,19 +270,37 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		MessageBox(NULL, L"Error loading Hook.dll.", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return 0;
 	}
-	if (!RegisterHook(_hLib)) {
+
+	// Damit nicht alle Prozesse gehookt werde, verwende ich jetzt die ThreadID des WhatsApp-Clients.
+	HWND hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME);
+	if (hwndWhatsapp == NULL)
+	{
+		MessageBox(NULL, L"WhatsApp-Window not found.", L"WhatsappTray", MB_OK | MB_ICONERROR);
+		return 0;
+	}
+
+	DWORD threadId = GetWindowThreadProcessId(hwndWhatsapp, NULL);
+	if (threadId == NULL)
+	{
+		MessageBox(NULL, L"ThreadID of WhatsApp-Window not found.", L"WhatsappTray", MB_OK | MB_ICONERROR);
+		return 0;
+	}
+
+	if (RegisterHook(_hLib, threadId, closeToTray) == false)
+	{
 		MessageBox(NULL, L"Error setting hook procedure.", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return 0;
 	}
-	wc.style         = 0;
-	wc.lpfnWndProc   = HookWndProc;
-	wc.cbClsExtra    = 0;
-	wc.cbWndExtra    = 0;
-	wc.hInstance     = hInstance;
-	wc.hIcon         = NULL;
-	wc.hCursor       = NULL;
+
+	wc.style = 0;
+	wc.lpfnWndProc = HookWndProc;
+	wc.cbClsExtra = 0;
+	wc.cbWndExtra = 0;
+	wc.hInstance = hInstance;
+	wc.hIcon = NULL;
+	wc.hCursor = NULL;
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wc.lpszMenuName  = NULL;
+	wc.lpszMenuName = NULL;
 	wc.lpszClassName = NAME;
 	if (!RegisterClass(&wc)) {
 		MessageBox(NULL, L"Error creating window class", L"WhatsappTray", MB_OK | MB_ICONERROR);
@@ -293,7 +313,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 	for (int i = 0; i < MAXTRAYITEMS; i++) {
 		_hwndItems[i] = NULL;
 	}
-	
+
 	while (IsWindow(_hwndHook) && GetMessage(&msg, _hwndHook, 0, 0)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);

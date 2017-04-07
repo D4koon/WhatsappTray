@@ -12,5 +12,5 @@
 
 #define DLLIMPORT __declspec(dllexport)
 
-BOOL DLLIMPORT RegisterHook(HMODULE);
+BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray);
 void DLLIMPORT UnRegisterHook();
