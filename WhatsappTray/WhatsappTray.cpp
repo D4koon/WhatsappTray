@@ -278,30 +278,39 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		return 0;
 	}
 
-	wchar_t* startMenuPrograms;
-	if (SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuPrograms) != S_OK) {
-		MessageBox(NULL, L"'Start Menu\\Programs' folder not found", L"WhatsappTray", MB_OK);
-		return 0;
-	}
-	wchar_t lnk[MAX_PATH];
-	StringCchCopy(lnk, MAX_PATH, startMenuPrograms);
-	CoTaskMemFree(startMenuPrograms);
-	StringCchCat(lnk, MAX_PATH, L"\\WhatsApp\\WhatsApp.lnk");
-	HINSTANCE hInst = ShellExecute(0, NULL, lnk, NULL, NULL, 1);
-	if (hInst <= (HINSTANCE)32) {
-		MessageBox(NULL, L"Error launching WhatsApp", L"WhatsappTray", MB_OK);
-		return 0;
-	}
-	// Damit nicht alle Prozesse gehookt werde, verwende ich jetzt die ThreadID des WhatsApp-Clients.
-	HWND hwndWhatsapp;
-	Sleep(100);
-	for (int attemptN = 0; (hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME)) == NULL; ++ attemptN) {
-		if (attemptN > 120) {
-			MessageBox(NULL, L"WhatsApp-Window not found.", L"WhatsappTray", MB_OK | MB_ICONERROR);
+	HWND hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME);
+	
+	// The reason why i disabled this check is, when an folder is open with the name "WhatsApp" this fails because it finds the explorer-window with that name.
+	//if (hwndWhatsapp == NULL)
+	{
+		// Start WhatsApp.
+		wchar_t* startMenuPrograms;
+		if (SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuPrograms) != S_OK) {
+			MessageBox(NULL, L"'Start Menu\\Programs' folder not found", L"WhatsappTray", MB_OK);
 			return 0;
 		}
-		Sleep(500);
+		wchar_t lnk[MAX_PATH];
+		StringCchCopy(lnk, MAX_PATH, startMenuPrograms);
+		CoTaskMemFree(startMenuPrograms);
+		StringCchCat(lnk, MAX_PATH, L"\\WhatsApp\\WhatsApp.lnk");
+		HINSTANCE hInst = ShellExecute(0, NULL, lnk, NULL, NULL, 1);
+		if (hInst <= (HINSTANCE)32) {
+			MessageBox(NULL, L"Error launching WhatsApp", L"WhatsappTray", MB_OK);
+			return 0;
+		}
+
+		// Wait for WhatsApp to be started.
+		Sleep(100);
+		for (int attemptN = 0; (hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME)) == NULL; ++attemptN) {
+			if (attemptN > 120) {
+				MessageBox(NULL, L"WhatsApp-Window not found.", L"WhatsappTray", MB_OK | MB_ICONERROR);
+				return 0;
+			}
+			Sleep(500);
+		}
 	}
+	
+	// Damit nicht alle Prozesse gehookt werde, verwende ich jetzt die ThreadID des WhatsApp-Clients.
 	DWORD threadId = GetWindowThreadProcessId(hwndWhatsapp, NULL);
 	if (threadId == NULL)
 	{
