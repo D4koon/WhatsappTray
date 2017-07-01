@@ -21,9 +21,15 @@
     <ClInclude Include="WhatsappTray.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Registry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="WhatsappTray.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Registry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

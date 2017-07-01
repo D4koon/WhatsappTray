@@ -1,4 +1,4 @@
-// ****************************************************************************
+﻿// ****************************************************************************
 // 
 // WhatsappTray
 // Copyright (C) 1998-2016  Sebastian Amann, Nikolay Redko, J.D. Purcell
@@ -32,7 +32,12 @@ static HMODULE _hLib;
 static HWND _hwndHook;
 static HWND _hwndItems[MAXTRAYITEMS];
 static HWND _hwndForMenu;
+static HWND hwndWhatsapp;
 static bool closeToTray;
+static bool launchOnWindowsStartup;
+
+HWND startWhatsapp();
+bool setHook();
 
 int FindInTray(HWND hwnd) {
 	for (int i = 0; i < MAXTRAYITEMS; i++) {
@@ -146,6 +151,9 @@ void RefreshWindowInTray(HWND hwnd) {
 	}
 }
 
+/*
+ * Create the rightclick-menue.
+ */
 void ExecuteMenu() {
 	HMENU hMenu;
 	POINT point;
@@ -155,16 +163,39 @@ void ExecuteMenu() {
 		MessageBox(NULL, L"Error creating menu.", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return;
 	}
+
+	AppendMenu(hMenu, MF_STRING, IDM_ABOUT,   L"About WhatsappTray");
+	// - Display options.
+
+	// -- Close to Tray
 	if (closeToTray)
 	{
-		AppendMenu(hMenu, MF_STRING, IDM_DUMMY, L"Close to tray active.");
+		AppendMenu(hMenu, MF_STRING, IDM_SETTING_CLOSE_TO_TRAY, L"Close to tray ☑");
 	}
-	AppendMenu(hMenu, MF_STRING, IDM_ABOUT,   L"About WhatsappTray");
-	AppendMenu(hMenu, MF_STRING, IDM_EXIT,    L"Exit WhatsappTray");
-	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
-	AppendMenu(hMenu, MF_STRING, IDM_CLOSE,   L"Close Window");
-	AppendMenu(hMenu, MF_STRING, IDM_RESTORE, L"Restore Window");
+	else
+	{
+		AppendMenu(hMenu, MF_STRING, IDM_SETTING_CLOSE_TO_TRAY, L"Close to tray ☐");
+	}
 
+	// -- Launch on Windows startup.
+	if (launchOnWindowsStartup)
+	{
+		AppendMenu(hMenu, MF_STRING, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup ☐");
+	}
+	else
+	{
+		AppendMenu(hMenu, MF_STRING, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup ☑");
+	}
+	
+	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
+	AppendMenu(hMenu, MF_STRING, IDM_RESTORE, L"Restore Window");
+	AppendMenu(hMenu, MF_STRING, IDM_EXIT,    L"Exit WhatsappTray");
+	// Make window closable by menueentry when closeToTray is active, because the closebutton doesn't work anymore...
+	if (closeToTray)
+	{
+		AppendMenu(hMenu, MF_STRING, IDM_CLOSE, L"Close Whatsapp");
+	}
+	
 	GetCursorPos(&point);
 	SetForegroundWindow(_hwndHook);
 
@@ -182,8 +213,8 @@ BOOL CALLBACK AboutDlgProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 		case WM_COMMAND:
 			switch (LOWORD(wParam)) {
 				case IDOK:
-					EndDialog(hWnd, TRUE);
-					break;
+EndDialog(hWnd, TRUE);
+break;
 				case IDCANCEL:
 					EndDialog(hWnd, FALSE);
 					break;
@@ -203,17 +234,29 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 	case WM_COMMAND:
 		switch (LOWORD(wParam))
 		{
-		case IDM_RESTORE:
-			RestoreWindowFromTray(_hwndForMenu);
-			break;
-		case IDM_CLOSE:
-			CloseWindowFromTray(_hwndForMenu);
-			break;
 		case IDM_ABOUT:
 			DialogBox(_hInstance, MAKEINTRESOURCE(IDD_ABOUT), _hwndHook, (DLGPROC)AboutDlgProc);
 			break;
+		case IDM_SETTING_CLOSE_TO_TRAY:
+			// Toggle the 'close to tray'-feature.
+			// We have to first change the value and then unregister and register to set the ne value in the hook.
+			closeToTray = !closeToTray;
+			UnRegisterHook();
+			setHook();
+			break;
+		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP:
+			// Toggle the 'launch on windows startup'-feature.
+			// We have to first change the value and then unregister and register to set the ne value in the hook.
+			launchOnWindowsStartup = !launchOnWindowsStartup;
+			break;
+		case IDM_RESTORE:
+			RestoreWindowFromTray(_hwndForMenu);
+			break;
 		case IDM_EXIT:
 			SendMessage(_hwndHook, WM_DESTROY, 0, 0);
+			break;
+		case IDM_CLOSE:
+			CloseWindowFromTray(_hwndForMenu);
 			break;
 		}
 		break;
@@ -257,8 +300,6 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine, int iCmdShow) {
-	WNDCLASS wc;
-	MSG msg;
 
 	closeToTray = strstr(szCmdLine, "--closeToTray");
 
@@ -278,52 +319,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		return 0;
 	}
 
-	HWND hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME);
-	
-	// The reason why i disabled this check is, when an folder is open with the name "WhatsApp" this fails because it finds the explorer-window with that name.
-	//if (hwndWhatsapp == NULL)
-	{
-		// Start WhatsApp.
-		wchar_t* startMenuPrograms;
-		if (SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuPrograms) != S_OK) {
-			MessageBox(NULL, L"'Start Menu\\Programs' folder not found", L"WhatsappTray", MB_OK);
-			return 0;
-		}
-		wchar_t lnk[MAX_PATH];
-		StringCchCopy(lnk, MAX_PATH, startMenuPrograms);
-		CoTaskMemFree(startMenuPrograms);
-		StringCchCat(lnk, MAX_PATH, L"\\WhatsApp\\WhatsApp.lnk");
-		HINSTANCE hInst = ShellExecute(0, NULL, lnk, NULL, NULL, 1);
-		if (hInst <= (HINSTANCE)32) {
-			MessageBox(NULL, L"Error launching WhatsApp", L"WhatsappTray", MB_OK);
-			return 0;
-		}
-
-		// Wait for WhatsApp to be started.
-		Sleep(100);
-		for (int attemptN = 0; (hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME)) == NULL; ++attemptN) {
-			if (attemptN > 120) {
-				MessageBox(NULL, L"WhatsApp-Window not found.", L"WhatsappTray", MB_OK | MB_ICONERROR);
-				return 0;
-			}
-			Sleep(500);
-		}
+	if (startWhatsapp() == NULL) {
+		return 0;
 	}
 	
-	// Damit nicht alle Prozesse gehookt werde, verwende ich jetzt die ThreadID des WhatsApp-Clients.
-	DWORD threadId = GetWindowThreadProcessId(hwndWhatsapp, NULL);
-	if (threadId == NULL)
+	if (setHook() == false)
 	{
-		MessageBox(NULL, L"ThreadID of WhatsApp-Window not found.", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return 0;
 	}
 
-	if (RegisterHook(_hLib, threadId, closeToTray) == false)
-	{
-		MessageBox(NULL, L"Error setting hook procedure.", L"WhatsappTray", MB_OK | MB_ICONERROR);
-		return 0;
-	}
-
+	WNDCLASS wc;
 	wc.style = 0;
 	wc.lpfnWndProc = HookWndProc;
 	wc.cbClsExtra = 0;
@@ -346,10 +351,65 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		_hwndItems[i] = NULL;
 	}
 
+	MSG msg;
 	while (IsWindow(_hwndHook) && GetMessage(&msg, _hwndHook, 0, 0)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
 
 	return 0;
+}
+
+HWND startWhatsapp()
+{
+	hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME);
+
+	// The reason why i disabled this check is, when an folder is open with the name "WhatsApp" this fails because it finds the explorer-window with that name.
+	//if (hwndWhatsapp == NULL)
+	{
+		// Start WhatsApp.
+		wchar_t* startMenuPrograms;
+		if (SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuPrograms) != S_OK) {
+			MessageBox(NULL, L"'Start Menu\\Programs' folder not found", L"WhatsappTray", MB_OK);
+			return NULL;
+		}
+		wchar_t lnk[MAX_PATH];
+		StringCchCopy(lnk, MAX_PATH, startMenuPrograms);
+		CoTaskMemFree(startMenuPrograms);
+		StringCchCat(lnk, MAX_PATH, L"\\WhatsApp\\WhatsApp.lnk");
+		HINSTANCE hInst = ShellExecute(0, NULL, lnk, NULL, NULL, 1);
+		if (hInst <= (HINSTANCE)32) {
+			MessageBox(NULL, L"Error launching WhatsApp", L"WhatsappTray", MB_OK);
+			return NULL;
+		}
+
+		// Wait for WhatsApp to be started.
+		Sleep(100);
+		for (int attemptN = 0; (hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME)) == NULL; ++attemptN) {
+			if (attemptN > 120) {
+				MessageBox(NULL, L"WhatsApp-Window not found.", L"WhatsappTray", MB_OK | MB_ICONERROR);
+				return NULL;
+			}
+			Sleep(500);
+		}
+	}
+
+	return hwndWhatsapp;
+}
+
+bool setHook()
+{
+	// Damit nicht alle Prozesse gehookt werde, verwende ich jetzt die ThreadID des WhatsApp-Clients.
+	DWORD threadId = GetWindowThreadProcessId(hwndWhatsapp, NULL);
+	if (threadId == NULL)
+	{
+		MessageBox(NULL, L"ThreadID of WhatsApp-Window not found.", L"WhatsappTray", MB_OK | MB_ICONERROR);
+		return false;
+	}
+
+	if (RegisterHook(_hLib, threadId, closeToTray) == false)
+	{
+		MessageBox(NULL, L"Error setting hook procedure.", L"WhatsappTray", MB_OK | MB_ICONERROR);
+		return false;
+	}
 }

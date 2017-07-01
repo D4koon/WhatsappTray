@@ -97,9 +97,11 @@
     </BuildLog>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Registry.cpp" />
     <ClCompile Include="WhatsappTray.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Registry.h" />
     <ClInclude Include="WhatsappTray.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
