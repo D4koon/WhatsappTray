@@ -20,10 +20,12 @@
 // ****************************************************************************
 
 #include <windows.h>
-#include <Shlobj.h>
-#include <Strsafe.h>
 #include "WhatsappTray.h"
 #include "resource.h"
+#include <Shlobj.h>
+#include <Strsafe.h>
+
+#include "ApplicationData.h"
 
 #define MAXTRAYITEMS 64
 
@@ -35,6 +37,7 @@ static HWND _hwndForMenu;
 static HWND hwndWhatsapp;
 static bool closeToTray;
 static bool launchOnWindowsStartup;
+static ApplicationData applicationData;
 
 HWND startWhatsapp();
 bool setHook();
@@ -237,17 +240,22 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 		case IDM_ABOUT:
 			DialogBox(_hInstance, MAKEINTRESOURCE(IDD_ABOUT), _hwndHook, (DLGPROC)AboutDlgProc);
 			break;
-		case IDM_SETTING_CLOSE_TO_TRAY:
+		case IDM_SETTING_CLOSE_TO_TRAY: {
 			// Toggle the 'close to tray'-feature.
 			// We have to first change the value and then unregister and register to set the ne value in the hook.
 			closeToTray = !closeToTray;
 			UnRegisterHook();
 			setHook();
+			// Write data to persistant storage.
+			applicationData.SetData(L"CLOSE_TO_TRAY", closeToTray);
 			break;
+		}
 		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP:
 			// Toggle the 'launch on windows startup'-feature.
 			// We have to first change the value and then unregister and register to set the ne value in the hook.
 			launchOnWindowsStartup = !launchOnWindowsStartup;
+			// Write data to persistant storage.
+			applicationData.SetData(L"LAUNCH_ON_WINDOWS_STARTUP", launchOnWindowsStartup);
 			break;
 		case IDM_RESTORE:
 			RestoreWindowFromTray(_hwndForMenu);
@@ -299,11 +307,22 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine, int iCmdShow) {
-
-	closeToTray = strstr(szCmdLine, "--closeToTray");
-
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine, int iCmdShow)
+{
 	_hInstance = hInstance;
+
+	// Read the settings from the persistan storage.
+	closeToTray = applicationData.GetDataOrSetDefault(L"CLOSE_TO_TRAY", false);
+	launchOnWindowsStartup = applicationData.GetDataOrSetDefault(L"LAUNCH_ON_WINDOWS_STARTUP", false);
+
+	// Check if closeToTray was set per commandline. (this overrides the persistent storage-value.
+	if (strstr(szCmdLine, "--closeToTray"))
+	{
+		closeToTray = true;
+		// Write data to persistant storage.
+		applicationData.SetData(L"CLOSE_TO_TRAY", closeToTray);
+	}
+	
 	_hwndHook = FindWindow(NAME, NAME);
 	if (_hwndHook) {
 		if (strstr(szCmdLine, "--exit")) {
