@@ -1,23 +1,23 @@
-﻿// ****************************************************************************
-// 
-// WhatsappTray
-// Copyright (C) 1998-2016  Sebastian Amann, Nikolay Redko, J.D. Purcell
-// 
-// This program is free software; you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
-// 
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-// 
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-// 
-// ****************************************************************************
+﻿/*
+*
+* WhatsappTray
+* Copyright (C) 1998-2017  Sebastian Amann, Nikolay Redko, J.D. Purcell
+*
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*
+*/
 
 #include <windows.h>
 #include "WhatsappTray.h"
@@ -26,6 +26,7 @@
 #include <Strsafe.h>
 
 #include "ApplicationData.h"
+#include "Registry.h"
 
 #define MAXTRAYITEMS 64
 
@@ -36,11 +37,17 @@ static HWND _hwndItems[MAXTRAYITEMS];
 static HWND _hwndForMenu;
 static HWND hwndWhatsapp;
 static bool closeToTray;
+
+/*
+* @brief If true the 'launch on windows startup'-feature is on.
+*/
 static bool launchOnWindowsStartup;
 static ApplicationData applicationData;
+static Registry registry;
 
 HWND startWhatsapp();
 bool setHook();
+void setLaunchOnWindowsStartupSetting(bool value);
 
 int FindInTray(HWND hwnd) {
 	for (int i = 0; i < MAXTRAYITEMS; i++) {
@@ -183,11 +190,11 @@ void ExecuteMenu() {
 	// -- Launch on Windows startup.
 	if (launchOnWindowsStartup)
 	{
-		AppendMenu(hMenu, MF_STRING, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup ☐");
+		AppendMenu(hMenu, MF_STRING, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup ☑");
 	}
 	else
 	{
-		AppendMenu(hMenu, MF_STRING, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup ☑");
+		AppendMenu(hMenu, MF_STRING, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup ☐");
 	}
 	
 	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
@@ -252,10 +259,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 		}
 		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP:
 			// Toggle the 'launch on windows startup'-feature.
-			// We have to first change the value and then unregister and register to set the ne value in the hook.
-			launchOnWindowsStartup = !launchOnWindowsStartup;
-			// Write data to persistant storage.
-			applicationData.SetData(L"LAUNCH_ON_WINDOWS_STARTUP", launchOnWindowsStartup);
+			setLaunchOnWindowsStartupSetting(!launchOnWindowsStartup);
 			break;
 		case IDM_RESTORE:
 			RestoreWindowFromTray(_hwndForMenu);
@@ -265,6 +269,9 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 			break;
 		case IDM_CLOSE:
 			CloseWindowFromTray(_hwndForMenu);
+
+			// Running WhatsappTray without Whatsapp makes no sence because if a new instance of Whatsapp is started, WhatsappTray would not hook it. Atleast not in the current implementation...
+			SendMessage(_hwndHook, WM_DESTROY, 0, 0);
 			break;
 		}
 		break;
@@ -313,9 +320,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 
 	// Read the settings from the persistan storage.
 	closeToTray = applicationData.GetDataOrSetDefault(L"CLOSE_TO_TRAY", false);
-	launchOnWindowsStartup = applicationData.GetDataOrSetDefault(L"LAUNCH_ON_WINDOWS_STARTUP", false);
+	// Setup the settings for launch on windows startup.
+	setLaunchOnWindowsStartupSetting(applicationData.GetDataOrSetDefault(L"LAUNCH_ON_WINDOWS_STARTUP", false));
 
-	// Check if closeToTray was set per commandline. (this overrides the persistent storage-value.
+	// Check if closeToTray was set per commandline. (this overrides the persistent storage-value.)
 	if (strstr(szCmdLine, "--closeToTray"))
 	{
 		closeToTray = true;
@@ -430,5 +438,22 @@ bool setHook()
 	{
 		MessageBox(NULL, L"Error setting hook procedure.", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return false;
+	}
+}
+
+/*
+ * @brief Sets the 'launch on windows startup'-setting.
+ */
+void setLaunchOnWindowsStartupSetting(bool value)
+{
+	launchOnWindowsStartup = value;
+	// Write data to persistant storage.
+	applicationData.SetData(L"LAUNCH_ON_WINDOWS_STARTUP", value);
+
+	if (value) {
+		registry.RegisterProgram();
+	}
+	else {
+		registry.UnregisterProgram();
 	}
 }

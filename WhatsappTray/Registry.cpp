@@ -1,5 +1,27 @@
+/*
+ * 
+ * WhatsappTray
+ * Copyright (C) 1998-2017  Sebastian Amann
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * 
+ */
+
 #include "Registry.h"
 
+const wchar_t* Registry::applicatinName = L"WhatsappTray";
 
 Registry::Registry()
 {
@@ -10,14 +32,22 @@ Registry::~Registry()
 {
 }
 
+/*
+* @brief Creates an entry in the registry to run WhatsappTray on startup.
+*/
 void Registry::RegisterProgram()
 {
+	// Get the path to WhatsappTray.
 	wchar_t szPathToExe[MAX_PATH];
-
 	GetModuleFileNameW(NULL, szPathToExe, MAX_PATH);
-	RegisterMyProgramForStartup(L"WhatsappTray", szPathToExe, L"");
+
+	// Set the autostart in registry.
+	RegisterMyProgramForStartup(applicatinName, szPathToExe, L"");
 }
 
+/*
+* @brief Creates an entry in the registry to run \p pszAppName on startup.
+*/
 bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, PCWSTR args)
 {
 	HKEY hKey = NULL;
@@ -59,6 +89,9 @@ bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, 
 	return fSuccess;
 }
 
+/*
+* @brief Returns true if the autorun entry for WhatsappTray exists in the registry.
+*/
 bool Registry::IsMyProgramRegisteredForStartup(PCWSTR pszAppName)
 {
 	HKEY hKey = NULL;
@@ -90,4 +123,12 @@ bool Registry::IsMyProgramRegisteredForStartup(PCWSTR pszAppName)
 	}
 
 	return fSuccess;
+}
+
+/*
+* @brief Deletes the entry in the registry to run WhatsappTray on startup.
+*/
+void Registry::UnregisterProgram()
+{
+	RegDeleteKeyValue(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", applicatinName);
 }
