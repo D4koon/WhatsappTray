@@ -25,7 +25,7 @@
 #include <sstream>
 
 #undef MODULE_NAME
-#define MODULE_NAME "[ApplicationData]"
+#define MODULE_NAME "[ApplicationData] "
 
 ApplicationData::ApplicationData()
 {

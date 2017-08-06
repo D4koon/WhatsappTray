@@ -25,11 +25,12 @@
 #include <fstream>
 #include <sstream>
 
-static HHOOK _hMouse = NULL;
+#undef MODULE_NAME
+#define MODULE_NAME "[WhatsappTrayHook] "
+
 static HHOOK _hWndProc = NULL;
 static HHOOK _mouseProc = NULL;
 static HHOOK _cbtProc = NULL;
-static HWND _hLastHit = NULL;
 
 // Only works for 32-bit apps or 64-bit apps depending on whether this is complied as 32-bit or 64-bit (Whatsapp is a 64Bit-App)
 LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
@@ -38,11 +39,17 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 	{
 		CWPSTRUCT *msg = (CWPSTRUCT*)lParam;
 
+		wchar_t buffer[2000];
+		//swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"CallWndRetProc message:%X", msg->message);
+		//OutputDebugString(buffer);
+
 		if (msg->message == WM_SYSCOMMAND)
 		{
 			// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
-			if (msg->wParam == 0xF020 || msg->wParam == 0xF060)
+			if (msg->wParam == SC_MINIMIZE)
 			{
+				OutputDebugString(MODULE_NAME L"SC_MINIMIZE");
+
 				// Ich prüfe hier noch ob der Fenstertitel übereinstimmt. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
 				// Ich könnte hier auch noch die klasse checken, das hat dann den vorteil, das es noch genauer ist.
 				// Sollte die Klasse von Whatsapp aus aber umbenannt werden muss ich hier wieder nachbesser.
@@ -51,6 +58,21 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 				{
 					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)msg->hwnd);
 				}
+			}
+		}
+		else if (msg->message == WM_NCDESTROY)
+		{
+			swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"WM_NCDESTROY hwnd:%X findwindow:%X", msg->hwnd, FindWindow(NAME, NAME));
+			OutputDebugString(buffer);
+
+			// Eigentlich sollte ich hier die gleichen probleme haben wie bei sc_minimize,
+			// Ich glaub aber das des zu einer zeit war wo noch ein globaler hook gemacht wurde...
+			// Deshalb denk ich es ist ok wenn ich hier den namen nicht prüfe.
+			// NOTE: Ich mach es deshalb nicht weil das Fenster zu den zeitpunkt nicht auffindbar ist, was warscheinlich daran liegt das es bereits geschlossen wurde.
+
+			bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, (LPARAM)msg->hwnd);
+			if (successfulSent) {
+				OutputDebugString(MODULE_NAME L"WM_WHAHTSAPP_CLOSING successful sent.");
 			}
 		}
 
@@ -170,6 +192,7 @@ LRESULT CALLBACK MouseProc(
 
 			if (mouseOnClosebutton)
 			{
+				//OutputDebugString(MODULE_NAME L"Closebutton mousedown");
 				//myfile << "\nMinimize";
 				//myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
 
@@ -190,7 +213,7 @@ BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
 	_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
 	if (_hWndProc == NULL)
 	{
-		OutputDebugString(L"RegisterHook() - Error Creation Hook _hWndProc\n");
+		OutputDebugString(MODULE_NAME L"RegisterHook() - Error Creation Hook _hWndProc\n");
 		UnRegisterHook();
 		return FALSE;
 	}
@@ -200,7 +223,7 @@ BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
 		_mouseProc = SetWindowsHookEx(WH_MOUSE, (HOOKPROC)MouseProc, hLib, threadId);
 		if (_mouseProc == NULL)
 		{
-			OutputDebugString(L"RegisterHook() - Error Creation Hook _hWndProc\n");
+			OutputDebugString(MODULE_NAME L"RegisterHook() - Error Creation Hook _hWndProc\n");
 			UnRegisterHook();
 			return FALSE;
 		}

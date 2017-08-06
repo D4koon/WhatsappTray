@@ -28,11 +28,14 @@
 #include "ApplicationData.h"
 #include "Registry.h"
 
+#undef MODULE_NAME
+#define MODULE_NAME "[WhatsappTray] "
+
 #define MAXTRAYITEMS 64
 
 static HINSTANCE _hInstance;
 static HMODULE _hLib;
-static HWND _hwndHook;
+static HWND _hwndWhatsappTray;
 static HWND _hwndItems[MAXTRAYITEMS];
 static HWND _hwndForMenu;
 static HWND hwndWhatsapp;
@@ -69,7 +72,7 @@ static void AddToTray(int i) {
 	NOTIFYICONDATA nid;
 	ZeroMemory(&nid, sizeof(nid));
 	nid.cbSize           = NOTIFYICONDATA_V2_SIZE;
-	nid.hWnd             = _hwndHook;
+	nid.hWnd             = _hwndWhatsappTray;
 	nid.uID              = (UINT)i;
 	nid.uFlags           = NIF_MESSAGE | NIF_ICON | NIF_TIP;
 	nid.uCallbackMessage = WM_TRAYCMD;
@@ -110,7 +113,7 @@ static void RemoveFromTray(int i) {
 	NOTIFYICONDATA nid;
 	ZeroMemory(&nid, sizeof(nid));
 	nid.cbSize = NOTIFYICONDATA_V2_SIZE;
-	nid.hWnd   = _hwndHook;
+	nid.hWnd   = _hwndWhatsappTray;
 	nid.uID    = (UINT)i;
 	Shell_NotifyIcon(NIM_DELETE, &nid);
 }
@@ -153,7 +156,7 @@ void RefreshWindowInTray(HWND hwnd) {
 		NOTIFYICONDATA nid;
 		ZeroMemory(&nid, sizeof(nid));
 		nid.cbSize = NOTIFYICONDATA_V2_SIZE;
-		nid.hWnd   = _hwndHook;
+		nid.hWnd   = _hwndWhatsappTray;
 		nid.uID    = (UINT)i;
 		nid.uFlags = NIF_TIP;
 		GetWindowText(hwnd, nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
@@ -199,19 +202,19 @@ void ExecuteMenu() {
 	
 	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
 	AppendMenu(hMenu, MF_STRING, IDM_RESTORE, L"Restore Window");
-	AppendMenu(hMenu, MF_STRING, IDM_EXIT,    L"Exit WhatsappTray");
+	//AppendMenu(hMenu, MF_STRING, IDM_EXIT,    L"Exit WhatsappTray");
 	// Make window closable by menueentry when closeToTray is active, because the closebutton doesn't work anymore...
-	if (closeToTray)
+	//if (closeToTray)
 	{
 		AppendMenu(hMenu, MF_STRING, IDM_CLOSE, L"Close Whatsapp");
 	}
 	
 	GetCursorPos(&point);
-	SetForegroundWindow(_hwndHook);
+	SetForegroundWindow(_hwndWhatsappTray);
 
-	TrackPopupMenu(hMenu, TPM_LEFTBUTTON | TPM_RIGHTBUTTON | TPM_RIGHTALIGN | TPM_BOTTOMALIGN, point.x, point.y, 0, _hwndHook, NULL);
+	TrackPopupMenu(hMenu, TPM_LEFTBUTTON | TPM_RIGHTBUTTON | TPM_RIGHTALIGN | TPM_BOTTOMALIGN, point.x, point.y, 0, _hwndWhatsappTray, NULL);
 
-	PostMessage(_hwndHook, WM_USER, 0, 0);
+	PostMessage(_hwndWhatsappTray, WM_USER, 0, 0);
 	DestroyMenu(hMenu);
 }
 
@@ -237,24 +240,24 @@ break;
 }
 
 LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+	//OutputDebugString(MODULE_NAME L"HookWndProc() - Message Received\n");
+
 	switch (msg)
 	{
-		OutputDebugString(L"HookWndProc() - Message Received\n");
-
 	case WM_COMMAND:
 		switch (LOWORD(wParam))
 		{
 		case IDM_ABOUT:
-			DialogBox(_hInstance, MAKEINTRESOURCE(IDD_ABOUT), _hwndHook, (DLGPROC)AboutDlgProc);
+			DialogBox(_hInstance, MAKEINTRESOURCE(IDD_ABOUT), _hwndWhatsappTray, (DLGPROC)AboutDlgProc);
 			break;
 		case IDM_SETTING_CLOSE_TO_TRAY: {
 			// Toggle the 'close to tray'-feature.
 			// We have to first change the value and then unregister and register to set the ne value in the hook.
 			closeToTray = !closeToTray;
-			UnRegisterHook();
-			setHook();
 			// Write data to persistant storage.
 			applicationData.SetData(L"CLOSE_TO_TRAY", closeToTray);
+
+			SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
 			break;
 		}
 		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP:
@@ -265,15 +268,21 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 			RestoreWindowFromTray(_hwndForMenu);
 			break;
 		case IDM_EXIT:
-			SendMessage(_hwndHook, WM_DESTROY, 0, 0);
+			// Running WhatsappTray without Whatsapp makes no sence because if a new instance of Whatsapp is started, WhatsappTray would not hook it. Atleast not in the current implementation...
+			DestroyWindow(_hwndWhatsappTray);
 			break;
 		case IDM_CLOSE:
 			CloseWindowFromTray(_hwndForMenu);
 
 			// Running WhatsappTray without Whatsapp makes no sence because if a new instance of Whatsapp is started, WhatsappTray would not hook it. Atleast not in the current implementation...
-			SendMessage(_hwndHook, WM_DESTROY, 0, 0);
+			DestroyWindow(_hwndWhatsappTray);
 			break;
 		}
+		break;
+	case WM_REAPPLY_HOOK:
+		UnRegisterHook();
+		hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME);
+		setHook();
 		break;
 	case WM_ADDTRAY:
 		MinimizeWindowToTray((HWND)lParam);
@@ -298,8 +307,14 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 			break;
 		}
 		break;
+
+	case WM_WHAHTSAPP_CLOSING:
+		// If Whatsapp is closing we want to close WhatsappTray as well.
+		//OutputDebugString(MODULE_NAME L"WM_WHAHTSAPP_CLOSING\n");
+		DestroyWindow(_hwndWhatsappTray);
+		break;
 	case WM_DESTROY:
-		MessageBox(NULL, L"HookWndProc() WM_DESTROY", L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		//MessageBox(NULL, L"HookWndProc() WM_DESTROY", L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
 		for (int i = 0; i < MAXTRAYITEMS; i++) {
 			if (_hwndItems[i]) {
 				RestoreWindowFromTray(_hwndItems[i]);
@@ -308,6 +323,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 		UnRegisterHook();
 		FreeLibrary(_hLib);
 		PostQuitMessage(0);
+		//OutputDebugString(MODULE_NAME L"QuitMessage posted.\n");
 		break;
 	}
 
@@ -330,23 +346,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		// Write data to persistant storage.
 		applicationData.SetData(L"CLOSE_TO_TRAY", closeToTray);
 	}
-	
-	_hwndHook = FindWindow(NAME, NAME);
-	if (_hwndHook) {
-		if (strstr(szCmdLine, "--exit")) {
-			SendMessage(_hwndHook, WM_CLOSE, 0, 0);
-		}
-		else {
-			MessageBox(NULL, L"WhatsappTray is already running.", L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
-		}
-		return 0;
-	}
 	if (!(_hLib = LoadLibrary(L"Hook.dll"))) {
 		MessageBox(NULL, L"Error loading Hook.dll.", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return 0;
 	}
 
 	if (startWhatsapp() == NULL) {
+		return 0;
+	}
+	
+	_hwndWhatsappTray = FindWindow(NAME, NAME);
+	if (_hwndWhatsappTray) {
+		if (strstr(szCmdLine, "--exit")) {
+			SendMessage(_hwndWhatsappTray, WM_CLOSE, 0, 0);
+		}
+		else {
+			//MessageBox(NULL, L"WhatsappTray is already running. Reapplying hook", L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
+			SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
+		}
 		return 0;
 	}
 	
@@ -370,7 +387,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		MessageBox(NULL, L"Error creating window class", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return 0;
 	}
-	if (!(_hwndHook = CreateWindow(NAME, NAME, WS_OVERLAPPED, 0, 0, 0, 0, (HWND)NULL, (HMENU)NULL, (HINSTANCE)hInstance, (LPVOID)NULL))) {
+	if (!(_hwndWhatsappTray = CreateWindow(NAME, NAME, WS_OVERLAPPED, 0, 0, 0, 0, (HWND)NULL, (HMENU)NULL, (HINSTANCE)hInstance, (LPVOID)NULL))) {
 		MessageBox(NULL, L"Error creating window", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return 0;
 	}
@@ -379,7 +396,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 	}
 
 	MSG msg;
-	while (IsWindow(_hwndHook) && GetMessage(&msg, _hwndHook, 0, 0)) {
+	while (IsWindow(_hwndWhatsappTray) && GetMessage(&msg, _hwndWhatsappTray, 0, 0)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
