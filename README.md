@@ -6,14 +6,8 @@ Intalled Whatsapp-Desktop-Client. Download from here: https://www.whatsapp.com/d
 **Important: DONT start the application wit adminrights unless WhatsApp running also with adminrights!**
 Otherwise it will not work because of communicationproblems between the two applications.
 
-Using:
-Start the WhatsappTray.exe and from this Point on the Minimize-Button in the Whatsapp-Client sends the Apllication to the Tray.
-
-If you want your closebutton to also minimize to tray you have to start with --closeToTray
-
-Exiting:
-Right click on the tray icon (Whatsapp must be minimized to tray) and click Exit in the
-popup menu.  Or run WhatsappTray.exe with --exit parameter.
+Usage:
+By starting WhatsappTray WhatsApp will be started and from this point on the minimize-button in the WhatsApp-client sends the apllication to the tray.
 
 Thanks to:
 Nikolay Redko and J.D. Purcell for creating the RBTray-Software (http://rbtray.sourceforge.net/)
