@@ -70,9 +70,13 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 			// Deshalb denk ich es ist ok wenn ich hier den namen nicht prüfe.
 			// NOTE: Ich mach es deshalb nicht weil das Fenster zu den zeitpunkt nicht auffindbar ist, was warscheinlich daran liegt das es bereits geschlossen wurde.
 
-			bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, (LPARAM)msg->hwnd);
-			if (successfulSent) {
-				OutputDebugString(MODULE_NAME L"WM_WHAHTSAPP_CLOSING successful sent.");
+			// Ich machs jetz so dass ich wenn ich das Whatsapp-Fenster nicht finde auch schließe, wegen den oben genannten gruenden.
+			if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME) || FindWindow(NULL, WHATSAPP_CLIENT_NAME) == NULL)
+			{
+				bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, (LPARAM)msg->hwnd);
+				if (successfulSent) {
+					OutputDebugString(MODULE_NAME L"WM_WHAHTSAPP_CLOSING successful sent.");
+				}
 			}
 		}
 

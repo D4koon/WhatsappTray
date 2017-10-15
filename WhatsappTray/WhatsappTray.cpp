@@ -285,6 +285,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 		setHook();
 		break;
 	case WM_ADDTRAY:
+		OutputDebugString(MODULE_NAME L"WM_ADDTRAY\n");
 		MinimizeWindowToTray((HWND)lParam);
 		break;
 	case WM_REMTRAY:
@@ -310,7 +311,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 
 	case WM_WHAHTSAPP_CLOSING:
 		// If Whatsapp is closing we want to close WhatsappTray as well.
-		//OutputDebugString(MODULE_NAME L"WM_WHAHTSAPP_CLOSING\n");
+		OutputDebugString(MODULE_NAME L"WM_WHAHTSAPP_CLOSING\n");
 		DestroyWindow(_hwndWhatsappTray);
 		break;
 	case WM_DESTROY:
