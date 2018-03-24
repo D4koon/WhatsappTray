@@ -223,6 +223,8 @@ FakesAssemblies/
 # Visual Studio 6 workspace options file
 *.opt
 
+*.exe
+
 # Visual Studio LightSwitch build output
 **/*.HTMLClient/GeneratedArtifacts
 **/*.DesktopClient/GeneratedArtifacts

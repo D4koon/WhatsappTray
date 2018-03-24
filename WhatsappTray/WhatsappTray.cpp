@@ -183,21 +183,21 @@ void ExecuteMenu() {
 	// -- Close to Tray
 	if (closeToTray)
 	{
-		AppendMenu(hMenu, MF_STRING, IDM_SETTING_CLOSE_TO_TRAY, L"Close to tray ☑");
+		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_CLOSE_TO_TRAY, L"Close to tray");
 	}
 	else
 	{
-		AppendMenu(hMenu, MF_STRING, IDM_SETTING_CLOSE_TO_TRAY, L"Close to tray ☐");
+		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_CLOSE_TO_TRAY, L"Close to tray");
 	}
 
 	// -- Launch on Windows startup.
 	if (launchOnWindowsStartup)
 	{
-		AppendMenu(hMenu, MF_STRING, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup ☑");
+		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup");
 	}
 	else
 	{
-		AppendMenu(hMenu, MF_STRING, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup ☐");
+		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, L"Launch on Windows startup");
 	}
 	
 	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
