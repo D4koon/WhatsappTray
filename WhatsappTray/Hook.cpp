@@ -214,12 +214,15 @@ LRESULT CALLBACK MouseProc(
 // Wenn ich als threadId 0 übergeben, ist es ein Globaler Hook.
 BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
 {
-	_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
-	if (_hWndProc == NULL)
+	if (!closeToTray)
 	{
-		OutputDebugString(MODULE_NAME L"RegisterHook() - Error Creation Hook _hWndProc\n");
-		UnRegisterHook();
-		return FALSE;
+		_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
+		if (_hWndProc == NULL)
+		{
+			OutputDebugString(MODULE_NAME L"RegisterHook() - Error Creation Hook _hWndProc\n");
+			UnRegisterHook();
+			return FALSE;
+		}
 	}
 
 	if (closeToTray)
