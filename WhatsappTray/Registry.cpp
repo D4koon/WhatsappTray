@@ -23,16 +23,9 @@
 
 #include "Registry.h"
 
+#include <exception>
+
 const wchar_t* Registry::applicatinName = L"WhatsappTray";
-
-Registry::Registry()
-{
-}
-
-
-Registry::~Registry()
-{
-}
 
 /*
 * @brief Creates an entry in the registry to run WhatsappTray on startup.
@@ -75,9 +68,11 @@ bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, 
 
 	fSuccess = (lResult == 0);
 
-	if (fSuccess)
-	{
-		dwSize = (wcslen(szValue) + 1) * 2;
+	if (fSuccess) {
+		if ((wcslen(szValue) + 1) * 2 > sizeof(DWORD)) {
+			throw std::exception("Registry::RegisterMyProgramForStartup() - String is too long.");
+		}
+		dwSize = static_cast<DWORD>((wcslen(szValue) + 1) * 2);
 		lResult = RegSetValueExW(hKey, pszAppName, 0, REG_SZ, (BYTE*)szValue, dwSize);
 		fSuccess = (lResult == 0);
 	}
