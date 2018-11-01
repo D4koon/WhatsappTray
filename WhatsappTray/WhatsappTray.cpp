@@ -457,6 +457,7 @@ bool setHook()
 		MessageBox(NULL, L"Error setting hook procedure.", L"WhatsappTray", MB_OK | MB_ICONERROR);
 		return false;
 	}
+	return true;
 }
 
 /*

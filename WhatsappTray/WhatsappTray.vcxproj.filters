@@ -29,6 +29,9 @@
     <ClInclude Include="stdafx.h">
       <Filter>Precompiled Header</Filter>
     </ClInclude>
+    <ClInclude Include="DirectoryWatcher.h">
+      <Filter>Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ApplicationData.cpp">
@@ -42,6 +45,9 @@
     </ClCompile>
     <ClCompile Include="stdafx.cpp">
       <Filter>Precompiled Header</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectoryWatcher.cpp">
+      <Filter>Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
