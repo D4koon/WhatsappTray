@@ -19,6 +19,8 @@
  * 
  */
 
+#include "stdafx.h"
+
 #include "Registry.h"
 
 const wchar_t* Registry::applicatinName = L"WhatsappTray";

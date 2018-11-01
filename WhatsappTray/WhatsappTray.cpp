@@ -19,7 +19,7 @@
 *
 */
 
-#include <windows.h>
+#include "stdafx.h"
 #include "WhatsappTray.h"
 #include "resource.h"
 #include <Shlobj.h>
@@ -129,7 +129,6 @@ static void RestoreWindowFromTray(HWND hwnd) {
 	ShowWindow(hwnd, SW_RESTORE);
 	SetForegroundWindow(hwnd);
 	RemoveWindowFromTray(hwnd);
-
 }
 
 static void CloseWindowFromTray(HWND hwnd) {
@@ -367,7 +366,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		}
 		return 0;
 	}
-	
+
 	if (setHook() == false)
 	{
 		return 0;
@@ -445,7 +444,8 @@ HWND startWhatsapp()
 bool setHook()
 {
 	// Damit nicht alle Prozesse gehookt werde, verwende ich jetzt die ThreadID des WhatsApp-Clients.
-	DWORD threadId = GetWindowThreadProcessId(hwndWhatsapp, NULL);
+	DWORD processId;
+	DWORD threadId = GetWindowThreadProcessId(hwndWhatsapp, &processId);
 	if (threadId == NULL)
 	{
 		MessageBox(NULL, L"ThreadID of WhatsApp-Window not found.", L"WhatsappTray", MB_OK | MB_ICONERROR);

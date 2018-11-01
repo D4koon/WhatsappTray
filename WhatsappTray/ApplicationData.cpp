@@ -18,6 +18,7 @@
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 *
 */
+#include "stdafx.h"
 
 #include "ApplicationData.h"
 #include <windows.h>
@@ -82,7 +83,7 @@ std::wstring ApplicationData::GetSettingsFile()
 	}
 
 	// Create settings-filder if not exists.
-	wcscat_s(applicationDataDirectoryPath, sizeof(applicationDataDirectoryPath), L"\\WhatsappTray");
+	wcscat_s(applicationDataDirectoryPath, MAX_PATH, L"\\WhatsappTray");
 	if (CreateDirectory(applicationDataDirectoryPath, NULL) == NULL)
 	{
 		// We can get here, if the folder already exists -> We dont want an error for that case ...
