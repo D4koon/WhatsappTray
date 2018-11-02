@@ -1,27 +1,28 @@
 /*
- * 
- * WhatsappTray
- * Copyright (C) 1998-2017  Sebastian Amann
- * 
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- * 
- */
+* 
+* WhatsappTray
+* Copyright (C) 1998-2018 Sebastian Amann
+* 
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+* 
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+* 
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+* 
+*/
 
 #include "stdafx.h"
 
 #include "Registry.h"
+#include "Helper.h"
 
 #include <exception>
 
@@ -57,8 +58,7 @@ bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, 
 	wcscat_s(szValue, count, pathToExe);
 	wcscat_s(szValue, count, L"\" ");
 
-	if (args != NULL)
-	{
+	if (args != NULL) {
 		// caller should make sure "args" is quoted if any single argument has a space
 		// e.g. (L"-name \"Mark Voidale\"");
 		wcscat_s(szValue, count, args);
@@ -69,7 +69,7 @@ bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, 
 	fSuccess = (lResult == 0);
 
 	if (fSuccess) {
-		if ((wcslen(szValue) + 1) * 2 > sizeof(DWORD)) {
+		if ((wcslen(szValue) + 1) * 2 > ULONG_MAX) {
 			throw std::exception("Registry::RegisterMyProgramForStartup() - String is too long.");
 		}
 		dwSize = static_cast<DWORD>((wcslen(szValue) + 1) * 2);
@@ -77,8 +77,7 @@ bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, 
 		fSuccess = (lResult == 0);
 	}
 
-	if (hKey != NULL)
-	{
+	if (hKey != NULL) {
 		RegCloseKey(hKey);
 		hKey = NULL;
 	}

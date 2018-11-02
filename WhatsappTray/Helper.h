@@ -21,18 +21,15 @@
 
 #pragma once
 
-#include <Windows.h>
+#include <string>
 
-class Registry
+class Helper
 {
 public:
-	Registry() { }
-	~Registry() { }
-	void RegisterProgram();
-	bool RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, PCWSTR args);
-	bool IsMyProgramRegisteredForStartup(PCWSTR pszAppName);
-	void UnregisterProgram();
-private:
-	static const wchar_t* applicatinName;
+	Helper() { }
+	~Helper() { }
+
+	static std::string Helper::GetApplicationExePath();
+	static std::wstring Helper::get_wstring(const std::string& s);
 };
 

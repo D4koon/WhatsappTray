@@ -1,7 +1,7 @@
 /*
 *
 * WhatsappTray
-* Copyright (C) 1998-2018 Sebastian Amann
+* Copyright (C) 1998-2018  Sebastian Amann
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -21,18 +21,15 @@
 
 #pragma once
 
-#include <Windows.h>
+#include <string>
 
-class Registry
+class DirectoryWatcher
 {
 public:
-	Registry() { }
-	~Registry() { }
-	void RegisterProgram();
-	bool RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, PCWSTR args);
-	bool IsMyProgramRegisteredForStartup(PCWSTR pszAppName);
-	void UnregisterProgram();
-private:
-	static const wchar_t* applicatinName;
+	DirectoryWatcher() { }
+	~DirectoryWatcher() { }
+	void WatchDirectory(LPTSTR lpDir);
+	void RefreshDirectory(LPTSTR lpDir);
+	void RefreshTree(LPTSTR lpDrive);
 };
 

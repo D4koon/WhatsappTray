@@ -32,6 +32,12 @@
     <ClInclude Include="DirectoryWatcher.h">
       <Filter>Files</Filter>
     </ClInclude>
+    <ClInclude Include="Logger.h">
+      <Filter>Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Helper.h">
+      <Filter>Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ApplicationData.cpp">
@@ -47,6 +53,12 @@
       <Filter>Precompiled Header</Filter>
     </ClCompile>
     <ClCompile Include="DirectoryWatcher.cpp">
+      <Filter>Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Logger.cpp">
+      <Filter>Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Helper.cpp">
       <Filter>Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -20,19 +20,42 @@
 */
 
 #pragma once
+#include <fstream>
+#include <string>
 
-#include <Windows.h>
-
-class Registry
+enum class Loglevel
 {
-public:
-	Registry() { }
-	~Registry() { }
-	void RegisterProgram();
-	bool RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, PCWSTR args);
-	bool IsMyProgramRegisteredForStartup(PCWSTR pszAppName);
-	void UnregisterProgram();
-private:
-	static const wchar_t* applicatinName;
+	LOG_NONE,
+	LOG_APP,
+	LOG_FATAL,
+	LOG_ERROR,
+	LOG_WARNING,
+	LOG_INFO,
+	LOG_DEBUG,
 };
 
+class Logger
+{
+private:
+	~Logger();
+	Logger();
+
+	std::ofstream logFile;
+
+	static Logger* loggerInstance;
+
+	bool Log(Loglevel loglevel, std::string text, ...);
+	bool LogLine(Loglevel loglevel, std::string text, ...);
+	bool LogVariadic(Loglevel loglevel, std::string text, va_list vadriaicList);
+
+public:
+	static Loglevel loglevelToLog;
+	static Logger& GetInstance();
+	static void ReleaseInstance();
+	static bool App(std::string text, ...);
+	static bool Fatal(std::string text, ...);
+	static bool Error(std::string text, ...);
+	static bool Warning(std::string text, ...);
+	static bool Info(std::string text, ...);
+	static bool Debug(std::string text, ...);
+};

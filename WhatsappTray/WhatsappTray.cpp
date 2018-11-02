@@ -22,11 +22,14 @@
 #include "stdafx.h"
 #include "WhatsappTray.h"
 #include "resource.h"
-#include <Shlobj.h>
-#include <Strsafe.h>
 
 #include "ApplicationData.h"
 #include "Registry.h"
+#include "DirectoryWatcher.h"
+
+#include <Shlobj.h>
+#include <Strsafe.h>
+
 
 #undef MODULE_NAME
 #define MODULE_NAME "[WhatsappTray] "
@@ -367,10 +370,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		return 0;
 	}
 
-	if (setHook() == false)
-	{
+	if (setHook() == false) {
 		return 0;
 	}
+
+	DirectoryWatcher dirWatcher;
+	dirWatcher.WatchDirectory(L"C:\\Users\\Dakoon\\AppData\\Roaming\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb");
 
 	WNDCLASS wc;
 	wc.style = 0;
