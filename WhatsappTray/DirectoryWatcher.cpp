@@ -24,55 +24,40 @@
 #include "DirectoryWatcher.h"
 #include "Logger.h"
 
-#include <windows.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <tchar.h>
-#include <iostream>
+#include <filesystem>
 
-void DirectoryWatcher::WatchDirectory(LPTSTR lpDir)
+
+namespace fs = std::experimental::filesystem;
+
+DirectoryWatcher::DirectoryWatcher(std::string directory, HWND notifyWindowHandle, UINT message)
+	: watchedDirectory(directory)
+	, notifyWindowHandle(notifyWindowHandle)
+	, message(message)
+	, watcherThread(&DirectoryWatcher::WatchDirectoryWorker, this, directory)
+{
+}
+
+void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
 {
 	DWORD dwWaitStatus;
-	HANDLE dwChangeHandles[2];
-	TCHAR lpDrive[4];
-	TCHAR lpFile[_MAX_FNAME];
-	TCHAR lpExt[_MAX_EXT];
-
-	_tsplitpath_s(lpDir, lpDrive, 4, NULL, 0, lpFile, _MAX_FNAME, lpExt, _MAX_EXT);
-
-	lpDrive[2] = (TCHAR)'\\';
-	lpDrive[3] = (TCHAR)'\0';
+	HANDLE dwChangeHandle;
 
 	// Watch the directory for file creation and deletion. 
-
-	dwChangeHandles[0] = FindFirstChangeNotification(
-		lpDir,                         // directory to watch 
+	dwChangeHandle = FindFirstChangeNotification(
+		directory.c_str(),                         // directory to watch 
 		FALSE,                         // do not watch subtree 
 		FILE_NOTIFY_CHANGE_FILE_NAME); // watch file name changes 
 
-	if (dwChangeHandles[0] == INVALID_HANDLE_VALUE) {
-		Logger::Error("ERROR: FindFirstChangeNotification function failed.\n");
-		ExitProcess(GetLastError());
+	if (dwChangeHandle == INVALID_HANDLE_VALUE) {
+		Logger::Error("ERROR: FindFirstChangeNotification function failed.");
+		return;
 	}
 
-	// Watch the subtree for directory creation and deletion. 
+	// Make a final validation check on our handle.
 
-	dwChangeHandles[1] = FindFirstChangeNotification(
-		lpDrive,                       // directory to watch 
-		TRUE,                          // watch the subtree 
-		FILE_NOTIFY_CHANGE_DIR_NAME);  // watch dir name changes 
-
-	if (dwChangeHandles[1] == INVALID_HANDLE_VALUE) {
-		Logger::Error("ERROR: FindFirstChangeNotification function failed.\n");
-		ExitProcess(GetLastError());
-	}
-
-
-	// Make a final validation check on our handles.
-
-	if ((dwChangeHandles[0] == NULL) || (dwChangeHandles[1] == NULL)) {
-		Logger::Error("ERROR: Unexpected NULL from FindFirstChangeNotification.\n");
-		ExitProcess(GetLastError());
+	if (dwChangeHandle == NULL) {
+		Logger::Error("ERROR: Unexpected NULL from FindFirstChangeNotification.");
+		return;
 	}
 
 	// Change notification is set. Now wait on both notification 
@@ -81,10 +66,9 @@ void DirectoryWatcher::WatchDirectory(LPTSTR lpDir)
 	while (TRUE) {
 		// Wait for notification.
 
-		Logger::Debug("Waiting for notification...\n");
+		Logger::Debug("Waiting for notification...");
 
-		dwWaitStatus = WaitForMultipleObjects(2, dwChangeHandles,
-			FALSE, INFINITE);
+		dwWaitStatus = WaitForSingleObject(dwChangeHandle, INFINITE);
 
 		switch (dwWaitStatus) {
 		case WAIT_OBJECT_0:
@@ -92,21 +76,9 @@ void DirectoryWatcher::WatchDirectory(LPTSTR lpDir)
 			// A file was created, renamed, or deleted in the directory.
 			// Refresh this directory and restart the notification.
 
-			RefreshDirectory(lpDir);
-			if (FindNextChangeNotification(dwChangeHandles[0]) == FALSE) {
-				Logger::Error("ERROR: FindNextChangeNotification function failed.\n");
-				ExitProcess(GetLastError());
-			}
-			break;
-
-		case WAIT_OBJECT_0 + 1:
-
-			// A directory was created, renamed, or deleted.
-			// Refresh the tree and restart the notification.
-
-			RefreshTree(lpDrive);
-			if (FindNextChangeNotification(dwChangeHandles[1]) == FALSE) {
-				Logger::Error("ERROR: FindNextChangeNotification function failed.\n");
+			RefreshDirectory();
+			if (FindNextChangeNotification(dwChangeHandle) == FALSE) {
+				Logger::Error("ERROR: FindNextChangeNotification function failed.");
 				ExitProcess(GetLastError());
 			}
 			break;
@@ -118,32 +90,30 @@ void DirectoryWatcher::WatchDirectory(LPTSTR lpDir)
 			// In a single-threaded environment you might not want an
 			// INFINITE wait.
 
-			Logger::Debug("No changes in the timeout period.\n");
+			Logger::Debug("No changes in the timeout period.");
 			break;
 
 		default:
-			Logger::Error("ERROR: Unhandled dwWaitStatus.\n");
+			Logger::Error("ERROR: Unhandled dwWaitStatus.");
 			ExitProcess(GetLastError());
 			break;
 		}
 	}
 }
 
-void DirectoryWatcher::RefreshDirectory(LPTSTR lpDir)
+void DirectoryWatcher::RefreshDirectory()
 {
 	// This is where you might place code to refresh your
 	// directory listing, but not the subtree because it
 	// would not be necessary.
 
-	Logger::Debug("Directory (%s) changed.\n", lpDir);
+	Logger::Debug("Directory (%s) changed.", watchedDirectory.c_str());
+
+	for (const auto& p : fs::directory_iterator(watchedDirectory)) {
+		std::string filnameString = p.path().filename().u8string();
+		Logger::Debug("File '%s'", filnameString.c_str());
+		//std::cout << p << std::endl; // "p" is the directory entry. Get the path with "p.path()".
+	}
+
+	PostMessageA(notifyWindowHandle, message, 0, 0);
 }
-
-void DirectoryWatcher::RefreshTree(LPTSTR lpDrive)
-{
-	// This is where you might place code to refresh your
-	// directory listing, including the subtree.
-
-	Logger::Debug("Directory tree (%s) changed.\n", lpDrive);
-}
-
-

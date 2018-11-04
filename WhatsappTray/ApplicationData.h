@@ -27,9 +27,9 @@ class ApplicationData
 public:
 	ApplicationData();
 	~ApplicationData();
-	bool SetData(std::wstring key, bool value);
-	bool GetDataOrSetDefault(std::wstring key, bool defaultValue);
+	bool SetData(std::string key, bool value);
+	bool GetDataOrSetDefault(std::string key, bool defaultValue);
 private:
-	std::wstring GetSettingsFile();
+	std::string GetSettingsFile();
 };
 

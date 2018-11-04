@@ -29,10 +29,10 @@ public:
 	Registry() { }
 	~Registry() { }
 	void RegisterProgram();
-	bool RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, PCWSTR args);
-	bool IsMyProgramRegisteredForStartup(PCWSTR pszAppName);
+	bool RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args);
+	bool IsMyProgramRegisteredForStartup(LPTSTR pszAppName);
 	void UnregisterProgram();
 private:
-	static const wchar_t* applicatinName;
+	static const LPTSTR applicatinName;
 };
 

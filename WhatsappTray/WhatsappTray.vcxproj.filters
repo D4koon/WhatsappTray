@@ -12,6 +12,9 @@
     <Filter Include="Precompiled Header">
       <UniqueIdentifier>{aeed58ce-9b0a-4a09-a1d9-087e2327d29d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Files\Logging">
+      <UniqueIdentifier>{65cf085c-1c27-43ca-a0b5-839dc1ae68bf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="WhatsappTray.h">
@@ -32,11 +35,11 @@
     <ClInclude Include="DirectoryWatcher.h">
       <Filter>Files</Filter>
     </ClInclude>
-    <ClInclude Include="Logger.h">
-      <Filter>Files</Filter>
-    </ClInclude>
     <ClInclude Include="Helper.h">
       <Filter>Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Logger.h">
+      <Filter>Files\Logging</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -55,11 +58,11 @@
     <ClCompile Include="DirectoryWatcher.cpp">
       <Filter>Files</Filter>
     </ClCompile>
-    <ClCompile Include="Logger.cpp">
-      <Filter>Files</Filter>
-    </ClCompile>
     <ClCompile Include="Helper.cpp">
       <Filter>Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Logger.cpp">
+      <Filter>Files\Logging</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

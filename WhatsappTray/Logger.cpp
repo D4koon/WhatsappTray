@@ -28,67 +28,113 @@
 #include <iostream>
 #include <time.h>
 
-Logger *Logger::loggerInstance = NULL;
+std::ofstream Logger::logFile;
 Loglevel Logger::loglevelToLog = Loglevel::LOG_ERROR;
+bool Logger::isSetupDone = false;
 
 Logger::Logger()
 {
-	if (Logger::loglevelToLog != Loglevel::LOG_NONE) {
-		time_t now = time(0);
-		struct tm localTimeStruct;
-		int errorNr = localtime_s(&localTimeStruct, &now);
-
-		const int LOGNAME_SIZE = 50;
-		static char timeString[LOGNAME_SIZE];
-		strftime(timeString, LOGNAME_SIZE, "%Y-%m-%d_%H#%M#%S", &localTimeStruct);
-
-		std::string fileUrl = Helper::GetApplicationExePath();
-		fileUrl.append("Log_");
-		fileUrl.append(timeString);
-		fileUrl.append(".txt");
-
-		std::cout << "Log to " << fileUrl << "\n";
-
-		logFile.open(fileUrl.c_str(), std::ofstream::out);
-		if ((logFile.rdstate() & std::ofstream::failbit) != 0) {
-			std::cout << "ERROR: Logfile could not be created!\n";
-		}
-	}
 }
 
 Logger::~Logger()
 {
-	if (logFile.is_open()) {
-		logFile.close();
-	}
 }
 
-Logger& Logger::GetInstance()
+void Logger::Setup()
 {
-	if (loggerInstance == NULL) {
-		loggerInstance = new Logger();
+	if (isSetupDone == true) {
+		OutputDebugStringA("ERROR: The setup for the logger was already done.\n");
+		return;
 	}
-	return *loggerInstance;
+
+	if (Logger::loglevelToLog == Loglevel::LOG_NONE) {
+		OutputDebugStringA("WARNING: The log-level is 'NONE'.\n");
+		return;
+	}
+
+	time_t now = time(0);
+	struct tm localTimeStruct;
+	int errorNr = localtime_s(&localTimeStruct, &now);
+
+	const int LOGNAME_SIZE = 50;
+	static char timeString[LOGNAME_SIZE];
+	strftime(timeString, LOGNAME_SIZE, "%Y-%m-%d_%H#%M#%S", &localTimeStruct);
+
+	std::string logPath = Helper::GetApplicationDirectory() + "log\\";
+	std::string logFileName = std::string("Log_") + timeString + std::string(".txt");
+
+	// Create log-folder
+	if (CreateDirectory(logPath.c_str(), NULL) == false && ERROR_ALREADY_EXISTS != GetLastError()) {
+		OutputDebugStringA("ERROR: Creating the log-folder failed and it was NOT because it did already existed.\n");
+		return;
+	}
+
+	OutputDebugStringA((std::string("Log to ") + logPath + logFileName + "\n").c_str());
+
+	logFile.open((logPath + logFileName).c_str(), std::ofstream::out);
+	if ((logFile.rdstate() & std::ofstream::failbit) != 0) {
+		OutputDebugStringA("ERROR: Logfile could not be created!\n");
+	}
+
+	isSetupDone = true;
 }
 
 void Logger::ReleaseInstance()
 {
-	if (loggerInstance != NULL) {
-		delete loggerInstance;
-		loggerInstance = NULL;
+	if (logFile.is_open()) {
+		logFile.close();
 	}
+
+	isSetupDone = false;
 }
 
-bool Logger::Log(Loglevel loglevel, std::string text, ...)
+bool Logger::App(std::string text, ...)
 {
-	bool returnvalue = false;
-
 	va_list argptr;
 	va_start(argptr, text);
-	LogVariadic(loglevel, text, argptr);
+	bool returnValue = LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
 	va_end(argptr);
-
-	return returnvalue;
+	return returnValue;
+}
+bool Logger::Fatal(std::string text, ...)
+{
+	va_list argptr;
+	va_start(argptr, text);
+	bool returnValue = LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
+	va_end(argptr);
+	return returnValue;
+}
+bool Logger::Error(std::string text, ...)
+{
+	va_list argptr;
+	va_start(argptr, text);
+	bool returnValue = LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
+	va_end(argptr);
+	return returnValue;
+}
+bool Logger::Warning(std::string text, ...)
+{
+	va_list argptr;
+	va_start(argptr, text);
+	bool returnValue = LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
+	va_end(argptr);
+	return returnValue;
+}
+bool Logger::Info(std::string text, ...)
+{
+	va_list argptr;
+	va_start(argptr, text);
+	bool returnValue = LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
+	va_end(argptr);
+	return returnValue;
+}
+bool Logger::Debug(std::string text, ...)
+{
+	va_list argptr;
+	va_start(argptr, text);
+	bool returnValue = LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
+	va_end(argptr);
+	return returnValue;
 }
 
 bool Logger::LogLine(Loglevel loglevel, std::string text, ...)
@@ -103,93 +149,61 @@ bool Logger::LogLine(Loglevel loglevel, std::string text, ...)
 	return returnvalue;
 }
 
-bool Logger::LogVariadic(Loglevel loglevel, std::string text, va_list argptr)
+bool Logger::Log(Loglevel loglevel, std::string text, ...)
+{
+	bool returnvalue = false;
+
+	va_list argptr;
+	va_start(argptr, text);
+	LogVariadic(loglevel, text, argptr);
+	va_end(argptr);
+
+	return returnvalue;
+}
+
+bool Logger::LogVariadic(Loglevel loglevel, std::string logFormatString, va_list argptr)
 {
 	const size_t buffersize = 5000;
 	int count = 0;
-	char charBuffer[buffersize];
-	count = vsnprintf(charBuffer, buffersize, text.c_str(), argptr);
+	char logStringBuffer[buffersize];
+	count = vsnprintf(logStringBuffer, buffersize, logFormatString.c_str(), argptr);
 
 	if (count > buffersize) {
 		OutputDebugStringA("Error: The buffer was to small for the logstring. It has to be adusted in the code if that happens.");
 		std::cerr << "Error: The buffer was to small for the logstring. It has to be adusted in the code if that happens.";
 	}
 
-	// Log everything above warning so that we can use DebugView for debugging.
-	if (loglevel <= Loglevel::LOG_WARNING) {
-		OutputDebugStringA(charBuffer);
-	}
-
-	// If the loglevel is above the maximum, nothing shall be loged.
-	if (loglevel > Logger::loglevelToLog) {
-		return false;
-	}
-
-	std::string errortext = "";
-	switch (loglevel) {
-	case Loglevel::LOG_APP: break;
-	case Loglevel::LOG_FATAL: errortext.append("FATAL: "); break;
-	case Loglevel::LOG_ERROR: errortext.append("ERROR: "); break;
-	case Loglevel::LOG_WARNING: errortext.append("WARNING: "); break;
-	case Loglevel::LOG_INFO: errortext.append("INFO: "); break;
-	case Loglevel::LOG_DEBUG: errortext.append("DEBUG: "); break;
-	}
-	errortext.append(text);
-
-	// Write text to console.
-	vfprintf(stdout, errortext.c_str(), argptr);
-
-	logFile << charBuffer;
-	logFile.flush();
+	ProcessLog(loglevel, logStringBuffer);
 
 	return true;
 }
 
-bool Logger::App(std::string text, ...)
+void Logger::ProcessLog(const Loglevel loglevel, const char* logTextBuffer)
 {
-	va_list argptr;
-	va_start(argptr, text);
-	bool returnValue = Logger::GetInstance().LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
-	va_end(argptr);
-	return returnValue;
-}
-bool Logger::Fatal(std::string text, ...)
-{
-	va_list argptr;
-	va_start(argptr, text);
-	bool returnValue = Logger::GetInstance().LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
-	va_end(argptr);
-	return returnValue;
-}
-bool Logger::Error(std::string text, ...)
-{
-	va_list argptr;
-	va_start(argptr, text);
-	bool returnValue = Logger::GetInstance().LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
-	va_end(argptr);
-	return returnValue;
-}
-bool Logger::Warning(std::string text, ...)
-{
-	va_list argptr;
-	va_start(argptr, text);
-	bool returnValue = Logger::GetInstance().LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
-	va_end(argptr);
-	return returnValue;
-}
-bool Logger::Info(std::string text, ...)
-{
-	va_list argptr;
-	va_start(argptr, text);
-	bool returnValue = Logger::GetInstance().LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
-	va_end(argptr);
-	return returnValue;
-}
-bool Logger::Debug(std::string text, ...)
-{
-	va_list argptr;
-	va_start(argptr, text);
-	bool returnValue = Logger::GetInstance().LogVariadic(Loglevel::LOG_APP, text + "\n", argptr);
-	va_end(argptr);
-	return returnValue;
+	if (isSetupDone == false) {
+		OutputDebugStringA("ERROR: Logger setup was not done!\n");
+		return;
+	}
+
+	std::string logText = "";
+	switch (loglevel) {
+	case Loglevel::LOG_APP: break;
+	case Loglevel::LOG_FATAL: logText = "FATAL: "; break;
+	case Loglevel::LOG_ERROR: logText = "ERROR: "; break;
+	case Loglevel::LOG_WARNING: logText = "WARNING: "; break;
+	case Loglevel::LOG_INFO: logText = "INFO: "; break;
+	case Loglevel::LOG_DEBUG: logText = "DEBUG: "; break;
+	}
+	logText.append(logTextBuffer);
+
+	// Log everything to VS-console/DebugView for debugging.
+	OutputDebugStringA(logText.c_str());
+
+	// If the loglevel is above the maximum, nothing shall be loged.
+	if (loglevel > Logger::loglevelToLog) {
+		return;
+	}
+
+	logFile << logText;
+	logFile.flush();
 }

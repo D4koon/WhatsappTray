@@ -22,14 +22,21 @@
 #pragma once
 
 #include <string>
+#include <thread>
+#include <windef.h>
 
 class DirectoryWatcher
 {
 public:
-	DirectoryWatcher() { }
+	DirectoryWatcher(std::string directory, HWND notifyWindowHandle, UINT message);
 	~DirectoryWatcher() { }
-	void WatchDirectory(LPTSTR lpDir);
-	void RefreshDirectory(LPTSTR lpDir);
-	void RefreshTree(LPTSTR lpDrive);
+	void WatchDirectoryWorker(std::string directory);
+	void RefreshDirectory();
+private:
+	std::string watchedDirectory;
+	HWND notifyWindowHandle;
+	/// The message to send to the notify-window, when the watched folder has changed.
+	UINT message;
+	std::thread watcherThread;
 };
 

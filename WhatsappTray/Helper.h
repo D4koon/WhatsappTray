@@ -29,7 +29,9 @@ public:
 	Helper() { }
 	~Helper() { }
 
-	static std::string Helper::GetApplicationExePath();
-	static std::wstring Helper::get_wstring(const std::string& s);
+	static std::string Helper::GetApplicationFilePath();
+	static std::string GetApplicationDirectory();
+	static std::wstring Helper::ToWString(const std::string& s);
+	static std::string Helper::ToString(const std::wstring& s);
 };
 

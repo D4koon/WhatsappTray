@@ -29,15 +29,32 @@
 #include <cassert>
 
 /*
-* @brief Creates an entry in the registry to run WhatsappTray on startup.
+* @brief Get the Path to the exe-file of the application.
 */
-std::string Helper::GetApplicationExePath()
+std::string Helper::GetApplicationFilePath()
 {
-	// Get the path to WhatsappTray.
 	char szPathToExe[MAX_PATH];
 	GetModuleFileNameA(NULL, szPathToExe, MAX_PATH);
 
 	return szPathToExe;
+}
+
+/*
+* @brief Get the Path to the directory where the exe-file of the application is.
+*/
+std::string Helper::GetApplicationDirectory()
+{
+	char szPathToExe[MAX_PATH];
+	GetModuleFileNameA(NULL, szPathToExe, MAX_PATH);
+
+	std::string applicationFilePath = GetApplicationFilePath();
+	std::size_t found = applicationFilePath.find_last_of('\\');
+	if (found == std::string::npos) {
+		OutputDebugString(TEXT("ERROR: GetApplicationDirectory() - Could not find \\ in the application-path.\n"));
+		return "";
+	}
+
+	return applicationFilePath.substr(0, found) + "\\";
 }
 
 /**
@@ -69,19 +86,45 @@ std::string Helper::GetApplicationExePath()
 /**
 * Untested!
 */
-std::wstring Helper::get_wstring(const std::string& inputString)
+std::wstring Helper::ToWString(const std::string& inputString)
 {
 	const char* inputC_String = inputString.c_str();
 	size_t size = inputString.length() + 1;
-	wchar_t* outputString = new wchar_t[size];
+	wchar_t* outputStringBuffer = new wchar_t[size];
 
 	size_t outSize;
-	errno_t convertResult = mbstowcs_s(&outSize, outputString, size, inputC_String, size - 1);
+	errno_t convertResult = mbstowcs_s(&outSize, outputStringBuffer, size, inputC_String, size - 1);
 
 	if (convertResult != NULL) {
 		Logger::Error("Error in mbsrtowcs(): %d", errno);
 		return L"";
 	}
+
+	std::wstring outputString = outputStringBuffer;
+	delete outputStringBuffer;
+
+	return outputString;
+}
+
+/**
+* Convert a std::wstring to a std::string.
+*/
+std::string Helper::ToString(const std::wstring& inputString)
+{
+	const wchar_t* inputC_String = inputString.c_str();
+	size_t size = inputString.length() + 1;
+	char* outputStringBuffer = new char[size];
+
+	size_t outSize;
+	errno_t convertResult = wcstombs_s(&outSize, outputStringBuffer, size, inputC_String, size - 1);
+
+	if (convertResult != NULL) {
+		Logger::Error("Error in mbsrtowcs(): %d", errno);
+		return "";
+	}
+
+	std::string outputString = outputStringBuffer;
+	delete outputStringBuffer;
 
 	return outputString;
 }

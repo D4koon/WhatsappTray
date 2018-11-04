@@ -37,20 +37,20 @@ enum class Loglevel
 class Logger
 {
 private:
-	~Logger();
 	Logger();
+	~Logger();
 
-	std::ofstream logFile;
-
-	static Logger* loggerInstance;
+	static std::ofstream logFile;
 
 	bool Log(Loglevel loglevel, std::string text, ...);
 	bool LogLine(Loglevel loglevel, std::string text, ...);
-	bool LogVariadic(Loglevel loglevel, std::string text, va_list vadriaicList);
+	static bool LogVariadic(Loglevel loglevel, std::string text, va_list vadriaicList);
+	static void ProcessLog(const Loglevel loglevel, const char* logTextBuffer);
 
 public:
 	static Loglevel loglevelToLog;
-	static Logger& GetInstance();
+	static bool isSetupDone;
+	static void Setup();
 	static void ReleaseInstance();
 	static bool App(std::string text, ...);
 	static bool Fatal(std::string text, ...);

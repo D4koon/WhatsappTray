@@ -24,9 +24,10 @@
 #include "Registry.h"
 #include "Helper.h"
 
+#include <tchar.h>
 #include <exception>
 
-const wchar_t* Registry::applicatinName = L"WhatsappTray";
+const LPTSTR Registry::applicatinName = TEXT("WhatsappTray");
 
 /*
 * @brief Creates an entry in the registry to run WhatsappTray on startup.
@@ -34,17 +35,17 @@ const wchar_t* Registry::applicatinName = L"WhatsappTray";
 void Registry::RegisterProgram()
 {
 	// Get the path to WhatsappTray.
-	wchar_t szPathToExe[MAX_PATH];
-	GetModuleFileNameW(NULL, szPathToExe, MAX_PATH);
+	TCHAR szPathToExe[MAX_PATH];
+	GetModuleFileName(NULL, szPathToExe, MAX_PATH);
 
 	// Set the autostart in registry.
-	RegisterMyProgramForStartup(applicatinName, szPathToExe, L"");
+	RegisterMyProgramForStartup(applicatinName, szPathToExe, TEXT(""));
 }
 
 /*
 * @brief Creates an entry in the registry to run \p pszAppName on startup.
 */
-bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, PCWSTR args)
+bool Registry::RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args)
 {
 	HKEY hKey = NULL;
 	LONG lResult = 0;
@@ -52,28 +53,28 @@ bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, 
 	DWORD dwSize;
 
 	const size_t count = MAX_PATH * 2;
-	wchar_t szValue[count] = { 0 };
+	TCHAR szValue[count] = { 0 };
 
-	wcscpy_s(szValue, count, L"\"");
-	wcscat_s(szValue, count, pathToExe);
-	wcscat_s(szValue, count, L"\" ");
+	_tcscpy_s(szValue, count, TEXT("\""));
+	_tcscat_s(szValue, count, pathToExe);
+	_tcscat_s(szValue, count, TEXT("\" "));
 
 	if (args != NULL) {
 		// caller should make sure "args" is quoted if any single argument has a space
 		// e.g. (L"-name \"Mark Voidale\"");
-		wcscat_s(szValue, count, args);
+		_tcscat_s(szValue, count, args);
 	}
 
-	lResult = RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, NULL, 0, (KEY_WRITE | KEY_READ), NULL, &hKey, NULL);
+	lResult = RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), 0, NULL, 0, (KEY_WRITE | KEY_READ), NULL, &hKey, NULL);
 
 	fSuccess = (lResult == 0);
 
 	if (fSuccess) {
-		if ((wcslen(szValue) + 1) * 2 > ULONG_MAX) {
+		if ((_tcslen(szValue) + 1) * 2 > ULONG_MAX) {
 			throw std::exception("Registry::RegisterMyProgramForStartup() - String is too long.");
 		}
-		dwSize = static_cast<DWORD>((wcslen(szValue) + 1) * 2);
-		lResult = RegSetValueExW(hKey, pszAppName, 0, REG_SZ, (BYTE*)szValue, dwSize);
+		dwSize = static_cast<DWORD>((_tcslen(szValue) + 1) * 2);
+		lResult = RegSetValueEx(hKey, pszAppName, 0, REG_SZ, (BYTE*)szValue, dwSize);
 		fSuccess = (lResult == 0);
 	}
 
@@ -88,7 +89,7 @@ bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, 
 /*
 * @brief Returns true if the autorun entry for WhatsappTray exists in the registry.
 */
-bool Registry::IsMyProgramRegisteredForStartup(PCWSTR pszAppName)
+bool Registry::IsMyProgramRegisteredForStartup(LPTSTR pszAppName)
 {
 	HKEY hKey = NULL;
 	LONG lResult = 0;
@@ -97,23 +98,20 @@ bool Registry::IsMyProgramRegisteredForStartup(PCWSTR pszAppName)
 	wchar_t szPathToExe[MAX_PATH] = { 0 };
 	DWORD dwSize = sizeof(szPathToExe);
 
-	lResult = RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey);
+	lResult = RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), 0, KEY_READ, &hKey);
 
 	fSuccess = (lResult == 0);
 
-	if (fSuccess)
-	{
-		lResult = RegGetValueW(hKey, NULL, pszAppName, RRF_RT_REG_SZ, &dwRegType, szPathToExe, &dwSize);
+	if (fSuccess) {
+		lResult = RegGetValue(hKey, NULL, pszAppName, RRF_RT_REG_SZ, &dwRegType, szPathToExe, &dwSize);
 		fSuccess = (lResult == 0);
 	}
 
-	if (fSuccess)
-	{
+	if (fSuccess) {
 		fSuccess = (wcslen(szPathToExe) > 0) ? TRUE : FALSE;
 	}
 
-	if (hKey != NULL)
-	{
+	if (hKey != NULL) {
 		RegCloseKey(hKey);
 		hKey = NULL;
 	}
@@ -126,5 +124,5 @@ bool Registry::IsMyProgramRegisteredForStartup(PCWSTR pszAppName)
 */
 void Registry::UnregisterProgram()
 {
-	RegDeleteKeyValue(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", applicatinName);
+	RegDeleteKeyValue(HKEY_CURRENT_USER, TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), applicatinName);
 }
