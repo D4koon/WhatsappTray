@@ -30,15 +30,6 @@
 #undef MODULE_NAME
 #define MODULE_NAME "[ApplicationData] "
 
-ApplicationData::ApplicationData()
-{
-}
-
-
-ApplicationData::~ApplicationData()
-{
-}
-
 /*
 * Set the data in the persistant storage.
 */

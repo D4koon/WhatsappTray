@@ -25,8 +25,8 @@
 class ApplicationData
 {
 public:
-	ApplicationData();
-	~ApplicationData();
+	ApplicationData() {}
+	~ApplicationData() {}
 	bool SetData(std::string key, bool value);
 	bool GetDataOrSetDefault(std::string key, bool defaultValue);
 private:
