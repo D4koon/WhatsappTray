@@ -64,7 +64,7 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 		{
 			uintptr_t handle1 = reinterpret_cast<uintptr_t>(msg->hwnd);
 			uintptr_t handle2 = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
-			swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"WM_NCDESTROY hwnd:%llX findwindow:%llX", handle1, handle2);
+			swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"WM_NCDESTROY hwnd=0x%llX findwindow=0x%llX", handle1, handle2);
 			OutputDebugString(buffer);
 
 			// Eigentlich sollte ich hier die gleichen probleme haben wie bei sc_minimize,
@@ -134,7 +134,6 @@ LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam) {
 					myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
 
 					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)msg->hwnd);
-					//PostMessage(FindWindow(NAME, NAME), WM_REFRTRAY, 0, (LPARAM)msg->hwnd);
 				}
 				myfile.close();
 			}

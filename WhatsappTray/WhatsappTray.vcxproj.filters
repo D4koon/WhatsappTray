@@ -59,6 +59,9 @@
     <ClInclude Include="WhatsAppApi.h">
       <Filter>Files</Filter>
     </ClInclude>
+    <ClInclude Include="TrayManager.h">
+      <Filter>Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ApplicationData.cpp">
@@ -89,6 +92,9 @@
       <Filter>Files\DirectoryWatcher\ReadDirectoryChanges</Filter>
     </ClCompile>
     <ClCompile Include="WhatsAppApi.cpp">
+      <Filter>Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TrayManager.cpp">
       <Filter>Files</Filter>
     </ClCompile>
   </ItemGroup>
