@@ -33,7 +33,7 @@
 #include <vector>
 #include <atlstr.h>
 
-typedef std::pair<DWORD,CStringW> TDirectoryChangeNotification;
+typedef std::pair<DWORD,CString> TDirectoryChangeNotification;
 
 namespace ReadDirectoryChangesPrivate
 {
@@ -123,10 +123,10 @@ public:
 	/// </summary>
 	HANDLE GetWaitHandle() { return m_Notifications.GetWaitHandle(); }
 
-	bool Pop(DWORD& dwAction, CStringW& wstrFilename);
+	bool Pop(DWORD& dwAction, CStringA& strFilename);
 
 	// "Push" is for usage by ReadChangesRequest.  Not intended for external usage.
-	void Push(DWORD dwAction, CStringW& wstrFilename);
+	void Push(DWORD dwAction, CStringA& strFilename);
 
 	// Check if the queue overflowed. If so, clear it and return true.
 	bool CheckOverflow();

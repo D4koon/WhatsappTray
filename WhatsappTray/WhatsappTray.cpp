@@ -31,6 +31,8 @@
 
 #include <Shlobj.h>
 #include <Strsafe.h>
+#include <regex>
+#include <Mmsystem.h>
 
 #undef MODULE_NAME
 #define MODULE_NAME "[WhatsappTray] "
@@ -52,6 +54,7 @@ static bool launchOnWindowsStartup;
 static ApplicationData applicationData;
 static Registry registry;
 
+void IndexedDbChanged(const DWORD dwAction, std::string strFilename);
 HWND startWhatsapp();
 bool setHook();
 void setLaunchOnWindowsStartupSetting(bool value);
@@ -330,6 +333,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 		Logger::Info(MODULE_NAME "QuitMessage posted.");
 		break;
 	case WM_INDEXED_DB_CHANGED:
+		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXIT, NULL, SND_ALIAS_ID);
 		Logger::Info(MODULE_NAME "WM_INDEXED_DB_CHANGED");
 		break;
 	}
@@ -404,7 +408,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		_hwndItems[i] = NULL;
 	}
 
-	DirectoryWatcher dirWatcher("C:\\Users\\Dakoon\\AppData\\Roaming\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb", _hwndWhatsappTray, WM_INDEXED_DB_CHANGED);
+	DirectoryWatcher dirWatcher("C:\\Users\\Dakoon\\AppData\\Roaming\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb", IndexedDbChanged);
 
 	MSG msg;
 	while (IsWindow(_hwndWhatsappTray) && GetMessage(&msg, _hwndWhatsappTray, 0, 0)) {
@@ -413,6 +417,96 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 	}
 
 	return 0;
+}
+void IndexedDbChanged(const DWORD dwAction, std::string strFilename)
+{
+	// The logfiles change so we have to keep track of them.
+	static std::string lastLogfile = "";
+	static int processedLineCount = 0;
+
+	if (strFilename.find(".log") == std::string::npos) {
+		return;
+	}
+
+	std::string lineBuffer;
+	if (strFilename.compare(lastLogfile) != 0) {
+		Logger::Info(MODULE_NAME "IndexedDbChanged() - The logfile has changed");
+		lastLogfile = strFilename;
+
+		// We have to reset the lineNumber when we find a new log-file ...
+		// Open the file in binary-mode else the eof is wrong.
+		std::ifstream file(strFilename.c_str(), std::ios_base::in | std::ios_base::binary);
+		if (file.is_open() == false) {
+			Logger::Error(MODULE_NAME "IndexedDbChanged() - file.is_open() == false");
+			return;
+		}
+
+		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXIT, NULL, SND_ALIAS_ID);
+
+		for (size_t lineCounter = 0; true; ) {
+			int character = file.get();
+
+			if (character == '\r') {
+				lineCounter++;
+			}
+
+			if (file.fail()) {
+				Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.fail()");
+				processedLineCount = lineCounter;
+				break;
+			}
+
+			if (file.eof()) {
+				Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.eof()");
+				processedLineCount = lineCounter;
+				break;
+			}
+		}
+
+		return;
+	}
+
+	// Open the file in binary-mode else the eof is wrong.
+	std::ifstream file(strFilename.c_str(), std::ios_base::in | std::ios_base::binary);
+	if (file.is_open() == false) {
+		Logger::Error(MODULE_NAME "IndexedDbChanged() - file.is_open() == false");
+		return;
+	}
+
+	for (size_t lineCounter = 0; true; lineCounter++) {
+		std::getline(file, lineBuffer, '\r');
+
+		if (file.fail()) {
+			Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.fail()");
+			return;
+		}
+
+		if (file.eof()) {
+			Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.eof()");
+			return;
+		}
+
+		if (lineCounter <= processedLineCount) {
+			// This line was already processed.
+			continue;
+		}
+		processedLineCount = lineCounter;
+
+		if (lineBuffer.find("recv:") == std::string::npos) {
+			continue;
+		}
+
+		Logger::Debug(MODULE_NAME "IndexedDbChanged() - found recv: '%s'", lineBuffer.c_str());
+
+		// Match: recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\ttimestampN
+		if (std::regex_search(lineBuffer.c_str(), std::regex("recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\\ttimestampN")) == false) {
+			continue;
+		}
+
+		Logger::Debug(MODULE_NAME "IndexedDbChanged() - found match");
+
+		PostMessageA(_hwndWhatsappTray, WM_INDEXED_DB_CHANGED, 0, 0);
+	}
 }
 
 HWND startWhatsapp()

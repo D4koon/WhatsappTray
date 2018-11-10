@@ -23,97 +23,70 @@
 
 #include "DirectoryWatcher.h"
 #include "Logger.h"
+#include "ReadDirectoryChanges/ReadDirectoryChanges.h"
 
-#include <filesystem>
-
-
-namespace fs = std::experimental::filesystem;
-
-DirectoryWatcher::DirectoryWatcher(std::string directory, HWND notifyWindowHandle, UINT message)
+DirectoryWatcher::DirectoryWatcher(std::string directory, const std::function<void(const DWORD, std::string)>& directoryChangedHandler)
 	: watchedDirectory(directory)
-	, notifyWindowHandle(notifyWindowHandle)
-	, message(message)
+	, directoryChangedEvent(directoryChangedHandler)
 	, watcherThread(&DirectoryWatcher::WatchDirectoryWorker, this, directory)
 {
 }
 
 void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
 {
-	DWORD dwWaitStatus;
-	HANDLE dwChangeHandle;
+	const DWORD dwNotificationFlags =
+		FILE_NOTIFY_CHANGE_LAST_WRITE
+		| FILE_NOTIFY_CHANGE_CREATION
+		| FILE_NOTIFY_CHANGE_FILE_NAME;
 
-	// Watch the directory for file creation and deletion. 
-	dwChangeHandle = FindFirstChangeNotification(
-		directory.c_str(),                         // directory to watch 
-		FALSE,                         // do not watch subtree 
-		FILE_NOTIFY_CHANGE_FILE_NAME); // watch file name changes 
 
-	if (dwChangeHandle == INVALID_HANDLE_VALUE) {
-		Logger::Error("ERROR: FindFirstChangeNotification function failed.");
-		return;
-	}
+	CReadDirectoryChanges changes;
+	changes.AddDirectory(directory.c_str(), false, dwNotificationFlags);
 
-	// Make a final validation check on our handle.
+	HANDLE hStdIn = ::GetStdHandle(STD_INPUT_HANDLE);
+	const HANDLE handles = changes.GetWaitHandle();
 
-	if (dwChangeHandle == NULL) {
-		Logger::Error("ERROR: Unexpected NULL from FindFirstChangeNotification.");
-		return;
-	}
+	bool bTerminate = false;
 
-	// Change notification is set. Now wait on both notification 
-	// handles and refresh accordingly. 
+	while (!bTerminate) {
+		DWORD rc = ::WaitForSingleObjectEx(handles, INFINITE, true);
+		switch (rc) {
+		case WAIT_OBJECT_0 + 0:
+		{
+			// We've received a notification in the queue.
+			if (changes.CheckOverflow()) {
+				Logger::Error("Queue overflowed.");
+			} else {
+				DWORD dwAction;
+				CStringA strFilename;
+				changes.Pop(dwAction, strFilename);
+				Logger::Debug("%s %s", ExplainAction(dwAction).c_str(), strFilename);
 
-	while (TRUE) {
-		// Wait for notification.
-
-		Logger::Debug("Waiting for notification...");
-
-		dwWaitStatus = WaitForSingleObject(dwChangeHandle, INFINITE);
-
-		switch (dwWaitStatus) {
-		case WAIT_OBJECT_0:
-
-			// A file was created, renamed, or deleted in the directory.
-			// Refresh this directory and restart the notification.
-
-			RefreshDirectory();
-			if (FindNextChangeNotification(dwChangeHandle) == FALSE) {
-				Logger::Error("ERROR: FindNextChangeNotification function failed.");
-				ExitProcess(GetLastError());
+				directoryChangedEvent(dwAction, std::string(strFilename));
 			}
-			break;
-
-		case WAIT_TIMEOUT:
-
-			// A timeout occurred, this would happen if some value other 
-			// than INFINITE is used in the Wait call and no changes occur.
-			// In a single-threaded environment you might not want an
-			// INFINITE wait.
-
-			Logger::Debug("No changes in the timeout period.");
-			break;
-
-		default:
-			Logger::Error("ERROR: Unhandled dwWaitStatus.");
-			ExitProcess(GetLastError());
+		}
+		break;
+		case WAIT_IO_COMPLETION:
+			// Nothing to do.
 			break;
 		}
 	}
 }
 
-void DirectoryWatcher::RefreshDirectory()
+std::string DirectoryWatcher::ExplainAction(DWORD dwAction)
 {
-	// This is where you might place code to refresh your
-	// directory listing, but not the subtree because it
-	// would not be necessary.
-
-	Logger::Debug("Directory (%s) changed.", watchedDirectory.c_str());
-
-	for (const auto& p : fs::directory_iterator(watchedDirectory)) {
-		std::string filnameString = p.path().filename().u8string();
-		Logger::Debug("File '%s'", filnameString.c_str());
-		//std::cout << p << std::endl; // "p" is the directory entry. Get the path with "p.path()".
+	switch (dwAction) {
+	case FILE_ACTION_ADDED:
+		return "Added";
+	case FILE_ACTION_REMOVED:
+		return "Deleted";
+	case FILE_ACTION_MODIFIED:
+		return "Modified";
+	case FILE_ACTION_RENAMED_OLD_NAME:
+		return "Renamed From";
+	case FILE_ACTION_RENAMED_NEW_NAME:
+		return "Renamed To";
+	default:
+		return "BAD DATA";
 	}
-
-	PostMessageA(notifyWindowHandle, message, 0, 0);
 }

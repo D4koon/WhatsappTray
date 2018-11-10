@@ -109,6 +109,7 @@
       <EnableCOMDATFolding>
       </EnableCOMDATFolding>
       <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalDependencies>Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <BuildLog>
       <Path>$(IntDir)Buildlog\$(MSBuildProjectName).log</Path>
@@ -126,6 +127,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="WhatsAppApi.cpp" />
     <ClCompile Include="WhatsappTray.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -138,6 +140,7 @@
     <ClInclude Include="ReadDirectoryChanges\ThreadSafeQueue.h" />
     <ClInclude Include="Registry.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="WhatsAppApi.h" />
     <ClInclude Include="WhatsappTray.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>

@@ -148,15 +148,16 @@ void CReadChangesRequest::ProcessNotification()
 	{
 		FILE_NOTIFY_INFORMATION& fni = (FILE_NOTIFY_INFORMATION&)*pBase;
 
-		CStringW wstrFilename(fni.FileName, fni.FileNameLength/sizeof(wchar_t));
+		CStringW wstrFilenameWide(fni.FileName, fni.FileNameLength/sizeof(wchar_t));
+
 		// Handle a trailing backslash, such as for a root directory.
 		if (m_wstrDirectory.Right(1) != L"\\")
-			wstrFilename = m_wstrDirectory + L"\\" + wstrFilename;
+			wstrFilenameWide = m_wstrDirectory + L"\\" + wstrFilenameWide;
 		else
-			wstrFilename = m_wstrDirectory + wstrFilename;
+			wstrFilenameWide = m_wstrDirectory + wstrFilenameWide;
 
 		// If it could be a short filename, expand it.
-		LPCWSTR wszFilename = PathFindFileNameW(wstrFilename);
+		LPCWSTR wszFilename = PathFindFileNameW(wstrFilenameWide);
 		int len = lstrlenW(wszFilename);
 		// The maximum length of an 8.3 filename is twelve, including the dot.
 		if (len <= 12 && wcschr(wszFilename, L'~'))
@@ -164,10 +165,11 @@ void CReadChangesRequest::ProcessNotification()
 			// Convert to the long filename form. Unfortunately, this
 			// does not work for deletions, so it's an imperfect fix.
 			wchar_t wbuf[MAX_PATH];
-			if (::GetLongPathNameW(wstrFilename, wbuf, _countof(wbuf)) > 0)
-				wstrFilename = wbuf;
+			if (::GetLongPathNameW(wstrFilenameWide, wbuf, _countof(wbuf)) > 0)
+				wstrFilenameWide = wbuf;
 		}
 
+		CStringA wstrFilename = CW2A(wstrFilenameWide, CP_UTF8);
 		m_pServer->m_pBase->Push(fni.Action, wstrFilename);
 
 		if (!fni.NextEntryOffset)

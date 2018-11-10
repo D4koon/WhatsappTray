@@ -15,8 +15,11 @@
     <Filter Include="Files\Logging">
       <UniqueIdentifier>{65cf085c-1c27-43ca-a0b5-839dc1ae68bf}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Files\ReadDirectoryChanges">
+    <Filter Include="Files\DirectoryWatcher">
       <UniqueIdentifier>{4d255d4b-50b8-4270-9cd2-425725e9ebb3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Files\DirectoryWatcher\ReadDirectoryChanges">
+      <UniqueIdentifier>{9d711e03-924c-4dd9-8a6f-102e02cb7cd3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -35,23 +38,26 @@
     <ClInclude Include="stdafx.h">
       <Filter>Precompiled Header</Filter>
     </ClInclude>
-    <ClInclude Include="DirectoryWatcher.h">
-      <Filter>Files</Filter>
-    </ClInclude>
     <ClInclude Include="Helper.h">
       <Filter>Files</Filter>
     </ClInclude>
     <ClInclude Include="Logger.h">
       <Filter>Files\Logging</Filter>
     </ClInclude>
+    <ClInclude Include="DirectoryWatcher.h">
+      <Filter>Files\DirectoryWatcher</Filter>
+    </ClInclude>
     <ClInclude Include="ReadDirectoryChanges\ReadDirectoryChanges.h">
-      <Filter>Files\ReadDirectoryChanges</Filter>
+      <Filter>Files\DirectoryWatcher\ReadDirectoryChanges</Filter>
     </ClInclude>
     <ClInclude Include="ReadDirectoryChanges\ReadDirectoryChangesPrivate.h">
-      <Filter>Files\ReadDirectoryChanges</Filter>
+      <Filter>Files\DirectoryWatcher\ReadDirectoryChanges</Filter>
     </ClInclude>
     <ClInclude Include="ReadDirectoryChanges\ThreadSafeQueue.h">
-      <Filter>Files\ReadDirectoryChanges</Filter>
+      <Filter>Files\DirectoryWatcher\ReadDirectoryChanges</Filter>
+    </ClInclude>
+    <ClInclude Include="WhatsAppApi.h">
+      <Filter>Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -67,20 +73,23 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Precompiled Header</Filter>
     </ClCompile>
-    <ClCompile Include="DirectoryWatcher.cpp">
-      <Filter>Files</Filter>
-    </ClCompile>
     <ClCompile Include="Helper.cpp">
       <Filter>Files</Filter>
     </ClCompile>
     <ClCompile Include="Logger.cpp">
       <Filter>Files\Logging</Filter>
     </ClCompile>
+    <ClCompile Include="DirectoryWatcher.cpp">
+      <Filter>Files\DirectoryWatcher</Filter>
+    </ClCompile>
     <ClCompile Include="ReadDirectoryChanges\ReadDirectoryChanges.cpp">
-      <Filter>Files\ReadDirectoryChanges</Filter>
+      <Filter>Files\DirectoryWatcher\ReadDirectoryChanges</Filter>
     </ClCompile>
     <ClCompile Include="ReadDirectoryChanges\ReadDirectoryChangesPrivate.cpp">
-      <Filter>Files\ReadDirectoryChanges</Filter>
+      <Filter>Files\DirectoryWatcher\ReadDirectoryChanges</Filter>
+    </ClCompile>
+    <ClCompile Include="WhatsAppApi.cpp">
+      <Filter>Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

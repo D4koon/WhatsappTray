@@ -25,16 +25,13 @@
 #include <thread>
 #include <windef.h>
 
-class DirectoryWatcher
+class WhatsAppApi
 {
 public:
-	DirectoryWatcher(std::string directory, const std::function<void(const DWORD, std::string)>& directoryChangedHandler);
-	~DirectoryWatcher() { }
-	void WatchDirectoryWorker(std::string directory);
+	WhatsAppApi(std::string directory, const std::function<void(const DWORD, std::string)>& callback);
+	~WhatsAppApi() { }
+	void WhatsAppApi::NotifyOnNewMessage(const std::function<void(const DWORD, std::string)>& newMessageHandler);
 private:
-	std::string watchedDirectory;
-	const std::function<void(const DWORD, std::string)> directoryChangedEvent;
-	std::thread watcherThread;
-	std::string ExplainAction(DWORD dwAction);
+	const std::function<void(const DWORD, std::string)> newMessageEvent;
 };
 
