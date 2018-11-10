@@ -42,6 +42,7 @@ static HWND _hwndWhatsappTray;
 
 static HWND _hwndForMenu;
 static HWND _hwndWhatsapp;
+
 static bool closeToTray;
 
 /*
@@ -88,8 +89,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_  HINSTANCE hPrevInstance, 
 	if (_hwndWhatsappTray) {
 		if (strstr(lpCmdLine, "--exit")) {
 			SendMessage(_hwndWhatsappTray, WM_CLOSE, 0, 0);
-		}
-		else {
+		} else {
 			//MessageBox(NULL, "WhatsappTray is already running. Reapplying hook", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 			SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
 		}
@@ -161,16 +161,15 @@ void ExecuteMenu()
 	// -- Launch on Windows startup.
 	if (launchOnWindowsStartup) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
-	}
-	else {
+	} else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
 	}
-	
+
 	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
 
 	AppendMenu(hMenu, MF_STRING, IDM_RESTORE, "Restore Window");
 	AppendMenu(hMenu, MF_STRING, IDM_CLOSE, "Close Whatsapp");
-	
+
 	POINT point;
 	GetCursorPos(&point);
 	SetForegroundWindow(_hwndWhatsappTray);
@@ -183,21 +182,21 @@ void ExecuteMenu()
 
 BOOL CALLBACK AboutDlgProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 	switch (Msg) {
-		case WM_CLOSE:
-			PostMessage(hWnd, WM_COMMAND, IDCANCEL, 0);
+	case WM_CLOSE:
+		PostMessage(hWnd, WM_COMMAND, IDCANCEL, 0);
+		break;
+	case WM_COMMAND:
+		switch (LOWORD(wParam)) {
+		case IDOK:
+			EndDialog(hWnd, TRUE);
 			break;
-		case WM_COMMAND:
-			switch (LOWORD(wParam)) {
-				case IDOK:
-EndDialog(hWnd, TRUE);
-break;
-				case IDCANCEL:
-					EndDialog(hWnd, FALSE);
-					break;
-			}
+		case IDCANCEL:
+			EndDialog(hWnd, FALSE);
 			break;
-		default:
-			return FALSE;
+		}
+		break;
+	default:
+		return FALSE;
 	}
 	return TRUE;
 }
@@ -206,15 +205,14 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	Logger::Info(MODULE_NAME "HookWndProc() - Message Received msg='0x%X'", msg);
 
-	switch (msg)
-	{
+	switch (msg) {
 	case WM_COMMAND:
-		switch (LOWORD(wParam))
-		{
+		switch (LOWORD(wParam)) {
 		case IDM_ABOUT:
 			DialogBox(_hInstance, MAKEINTRESOURCE(IDD_ABOUT), _hwndWhatsappTray, (DLGPROC)AboutDlgProc);
 			break;
-		case IDM_SETTING_CLOSE_TO_TRAY: {
+		case IDM_SETTING_CLOSE_TO_TRAY:
+		{
 			// Toggle the 'close to tray'-feature.
 			// We have to first change the value and then unregister and register to set the ne value in the hook.
 			closeToTray = !closeToTray;
@@ -272,7 +270,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_DESTROY:
 		Logger::Info(MODULE_NAME "WM_DESTROY");
-		
+
 		trayManager->RestoreAllWindowsFromTray();
 
 		UnRegisterHook();
@@ -333,14 +331,12 @@ bool setHook()
 	// Damit nicht alle Prozesse gehookt werde, verwende ich jetzt die ThreadID des WhatsApp-Clients.
 	DWORD processId;
 	DWORD threadId = GetWindowThreadProcessId(_hwndWhatsapp, &processId);
-	if (threadId == NULL)
-	{
+	if (threadId == NULL) {
 		MessageBox(NULL, "ThreadID of WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return false;
 	}
 
-	if (RegisterHook(_hLib, threadId, closeToTray) == false)
-	{
+	if (RegisterHook(_hLib, threadId, closeToTray) == false) {
 		MessageBox(NULL, "Error setting hook procedure.", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return false;
 	}
@@ -358,8 +354,7 @@ void setLaunchOnWindowsStartupSetting(bool value)
 
 	if (value) {
 		registry.RegisterProgram();
-	}
-	else {
+	} else {
 		registry.UnregisterProgram();
 	}
 }
