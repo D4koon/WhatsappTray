@@ -101,7 +101,7 @@ std::wstring Helper::ToWString(const std::string& inputString)
 	}
 
 	std::wstring outputString = outputStringBuffer;
-	delete outputStringBuffer;
+	delete[] outputStringBuffer;
 
 	return outputString;
 }
@@ -124,7 +124,17 @@ std::string Helper::ToString(const std::wstring& inputString)
 	}
 
 	std::string outputString = outputStringBuffer;
-	delete outputStringBuffer;
+	delete[] outputStringBuffer;
 
 	return outputString;
+}
+
+HICON Helper::GetWindowIcon(HWND hwnd)
+{
+	HICON icon;
+	if (icon = (HICON)SendMessage(hwnd, WM_GETICON, ICON_SMALL, 0)) return icon;
+	if (icon = (HICON)SendMessage(hwnd, WM_GETICON, ICON_BIG, 0)) return icon;
+	if (icon = (HICON)GetClassLongPtr(hwnd, GCLP_HICONSM)) return icon;
+	if (icon = (HICON)GetClassLongPtr(hwnd, GCLP_HICON)) return icon;
+	return LoadIcon(NULL, IDI_WINLOGO);
 }

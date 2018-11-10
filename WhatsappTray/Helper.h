@@ -33,5 +33,6 @@ public:
 	static std::string GetApplicationDirectory();
 	static std::wstring Helper::ToWString(const std::string& s);
 	static std::string Helper::ToString(const std::wstring& s);
+	static HICON GetWindowIcon(HWND hwnd);
 };
 

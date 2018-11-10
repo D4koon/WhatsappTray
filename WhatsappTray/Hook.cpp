@@ -62,7 +62,9 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 		}
 		else if (msg->message == WM_NCDESTROY)
 		{
-			swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"WM_NCDESTROY hwnd:%X findwindow:%X", msg->hwnd, FindWindow(NAME, NAME));
+			uintptr_t handle1 = reinterpret_cast<uintptr_t>(msg->hwnd);
+			uintptr_t handle2 = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
+			swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"WM_NCDESTROY hwnd:%llX findwindow:%llX", handle1, handle2);
 			OutputDebugString(buffer);
 
 			// Eigentlich sollte ich hier die gleichen probleme haben wie bei sc_minimize,

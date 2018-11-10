@@ -25,14 +25,12 @@
 
 #include "ApplicationData.h"
 #include "Registry.h"
-#include "DirectoryWatcher.h"
+#include "WhatsAppApi.h"
 #include "Helper.h"
 #include "Logger.h"
 
 #include <Shlobj.h>
 #include <Strsafe.h>
-#include <regex>
-#include <Mmsystem.h>
 
 #undef MODULE_NAME
 #define MODULE_NAME "[WhatsappTray] "
@@ -54,28 +52,20 @@ static bool launchOnWindowsStartup;
 static ApplicationData applicationData;
 static Registry registry;
 
-void IndexedDbChanged(const DWORD dwAction, std::string strFilename);
 HWND startWhatsapp();
 bool setHook();
 void setLaunchOnWindowsStartupSetting(bool value);
 
-int FindInTray(HWND hwnd) {
+int FindInTray(HWND hwnd)
+{
 	for (int i = 0; i < MAXTRAYITEMS; i++) {
 		if (_hwndItems[i] == hwnd) return i;
 	}
 	return -1;
 }
 
-HICON GetWindowIcon(HWND hwnd) {
-	HICON icon;
-	if (icon = (HICON)SendMessage(hwnd, WM_GETICON, ICON_SMALL, 0)) return icon;
-	if (icon = (HICON)SendMessage(hwnd, WM_GETICON, ICON_BIG, 0)) return icon;
-	if (icon = (HICON)GetClassLongPtr(hwnd, GCLP_HICONSM)) return icon;
-	if (icon = (HICON)GetClassLongPtr(hwnd, GCLP_HICON)) return icon;
-	return LoadIcon(NULL, IDI_WINLOGO);
-}
-
-static void AddToTray(int i) {
+static void AddToTray(int i)
+{
 	NOTIFYICONDATA nid;
 	ZeroMemory(&nid, sizeof(nid));
 	nid.cbSize           = NOTIFYICONDATA_V2_SIZE;
@@ -83,21 +73,23 @@ static void AddToTray(int i) {
 	nid.uID              = (UINT)i;
 	nid.uFlags           = NIF_MESSAGE | NIF_ICON | NIF_TIP;
 	nid.uCallbackMessage = WM_TRAYCMD;
-	nid.hIcon            = GetWindowIcon(_hwndItems[i]);
+	nid.hIcon            = Helper::GetWindowIcon(_hwndItems[i]);
 	GetWindowText(_hwndItems[i], nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
 	nid.uVersion         = NOTIFYICON_VERSION;
 	Shell_NotifyIcon(NIM_ADD, &nid);
 	Shell_NotifyIcon(NIM_SETVERSION, &nid);
 }
 
-static void AddWindowToTray(HWND hwnd) {
+static void AddWindowToTray(HWND hwnd)
+{
 	int i = FindInTray(NULL);
-	if (i == -1) return;
+	if (i == -1) { return; }
 	_hwndItems[i] = hwnd;
 	AddToTray(i);
 }
 
-static void MinimizeWindowToTray(HWND hwnd) {
+static void MinimizeWindowToTray(HWND hwnd)
+{
 	// Don't minimize MDI child windows
 	if ((UINT)GetWindowLongPtr(hwnd, GWL_EXSTYLE) & WS_EX_MDICHILD) return;
 
@@ -116,7 +108,8 @@ static void MinimizeWindowToTray(HWND hwnd) {
 	ShowWindow(hwnd, SW_HIDE);
 }
 
-static void RemoveFromTray(int i) {
+static void RemoveFromTray(int i)
+{
 	NOTIFYICONDATA nid;
 	ZeroMemory(&nid, sizeof(nid));
 	nid.cbSize = NOTIFYICONDATA_V2_SIZE;
@@ -125,20 +118,23 @@ static void RemoveFromTray(int i) {
 	Shell_NotifyIcon(NIM_DELETE, &nid);
 }
 
-static void RemoveWindowFromTray(HWND hwnd) {
+static void RemoveWindowFromTray(HWND hwnd)
+{
 	int i = FindInTray(hwnd);
 	if (i == -1) return;
 	RemoveFromTray(i);
 	_hwndItems[i] = 0;
 }
 
-static void RestoreWindowFromTray(HWND hwnd) {
+static void RestoreWindowFromTray(HWND hwnd)
+{
 	ShowWindow(hwnd, SW_RESTORE);
 	SetForegroundWindow(hwnd);
 	RemoveWindowFromTray(hwnd);
 }
 
-static void CloseWindowFromTray(HWND hwnd) {
+static void CloseWindowFromTray(HWND hwnd)
+{
 	// Use PostMessage to avoid blocking if the program brings up a dialog on exit.
 	// Also, Explorer windows ignore WM_CLOSE messages from SendMessage.
 	PostMessage(hwnd, WM_CLOSE, 0, 0);
@@ -152,7 +148,8 @@ static void CloseWindowFromTray(HWND hwnd) {
 	}
 }
 
-void RefreshWindowInTray(HWND hwnd) {
+void RefreshWindowInTray(HWND hwnd)
+{
 	int i = FindInTray(hwnd);
 	if (i == -1) return;
 	if (!IsWindow(hwnd) || IsWindowVisible(hwnd)) {
@@ -187,22 +184,18 @@ void ExecuteMenu() {
 	// - Display options.
 
 	// -- Close to Tray
-	if (closeToTray)
-	{
+	if (closeToTray) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_CLOSE_TO_TRAY, "Close to tray");
 	}
-	else
-	{
+	else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_CLOSE_TO_TRAY, "Close to tray");
 	}
 
 	// -- Launch on Windows startup.
-	if (launchOnWindowsStartup)
-	{
+	if (launchOnWindowsStartup) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
 	}
-	else
-	{
+	else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
 	}
 	
@@ -341,7 +334,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine, int iCmdShow)
+int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_  HINSTANCE hPrevInstance, _In_  LPSTR lpCmdLine, _In_  int nShowCmd)
 {
 	Logger::Setup();
 
@@ -353,7 +346,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 	setLaunchOnWindowsStartupSetting(applicationData.GetDataOrSetDefault("LAUNCH_ON_WINDOWS_STARTUP", false));
 
 	// Check if closeToTray was set per commandline. (this overrides the persistent storage-value.)
-	if (strstr(szCmdLine, "--closeToTray"))
+	if (strstr(lpCmdLine, "--closeToTray"))
 	{
 		closeToTray = true;
 		// Write data to persistant storage.
@@ -371,7 +364,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 	// Test if WhatsappTray is already running.
 	_hwndWhatsappTray = FindWindow(NAME, NAME);
 	if (_hwndWhatsappTray) {
-		if (strstr(szCmdLine, "--exit")) {
+		if (strstr(lpCmdLine, "--exit")) {
 			SendMessage(_hwndWhatsappTray, WM_CLOSE, 0, 0);
 		}
 		else {
@@ -408,7 +401,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 		_hwndItems[i] = NULL;
 	}
 
-	DirectoryWatcher dirWatcher("C:\\Users\\Dakoon\\AppData\\Roaming\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb", IndexedDbChanged);
+	// Send a WM_INDEXED_DB_CHANGED-message when a new WhatsApp-message has arrived.
+	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_INDEXED_DB_CHANGED, 0, 0); });
 
 	MSG msg;
 	while (IsWindow(_hwndWhatsappTray) && GetMessage(&msg, _hwndWhatsappTray, 0, 0)) {
@@ -417,96 +411,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine
 	}
 
 	return 0;
-}
-void IndexedDbChanged(const DWORD dwAction, std::string strFilename)
-{
-	// The logfiles change so we have to keep track of them.
-	static std::string lastLogfile = "";
-	static int processedLineCount = 0;
-
-	if (strFilename.find(".log") == std::string::npos) {
-		return;
-	}
-
-	std::string lineBuffer;
-	if (strFilename.compare(lastLogfile) != 0) {
-		Logger::Info(MODULE_NAME "IndexedDbChanged() - The logfile has changed");
-		lastLogfile = strFilename;
-
-		// We have to reset the lineNumber when we find a new log-file ...
-		// Open the file in binary-mode else the eof is wrong.
-		std::ifstream file(strFilename.c_str(), std::ios_base::in | std::ios_base::binary);
-		if (file.is_open() == false) {
-			Logger::Error(MODULE_NAME "IndexedDbChanged() - file.is_open() == false");
-			return;
-		}
-
-		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXIT, NULL, SND_ALIAS_ID);
-
-		for (size_t lineCounter = 0; true; ) {
-			int character = file.get();
-
-			if (character == '\r') {
-				lineCounter++;
-			}
-
-			if (file.fail()) {
-				Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.fail()");
-				processedLineCount = lineCounter;
-				break;
-			}
-
-			if (file.eof()) {
-				Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.eof()");
-				processedLineCount = lineCounter;
-				break;
-			}
-		}
-
-		return;
-	}
-
-	// Open the file in binary-mode else the eof is wrong.
-	std::ifstream file(strFilename.c_str(), std::ios_base::in | std::ios_base::binary);
-	if (file.is_open() == false) {
-		Logger::Error(MODULE_NAME "IndexedDbChanged() - file.is_open() == false");
-		return;
-	}
-
-	for (size_t lineCounter = 0; true; lineCounter++) {
-		std::getline(file, lineBuffer, '\r');
-
-		if (file.fail()) {
-			Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.fail()");
-			return;
-		}
-
-		if (file.eof()) {
-			Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.eof()");
-			return;
-		}
-
-		if (lineCounter <= processedLineCount) {
-			// This line was already processed.
-			continue;
-		}
-		processedLineCount = lineCounter;
-
-		if (lineBuffer.find("recv:") == std::string::npos) {
-			continue;
-		}
-
-		Logger::Debug(MODULE_NAME "IndexedDbChanged() - found recv: '%s'", lineBuffer.c_str());
-
-		// Match: recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\ttimestampN
-		if (std::regex_search(lineBuffer.c_str(), std::regex("recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\\ttimestampN")) == false) {
-			continue;
-		}
-
-		Logger::Debug(MODULE_NAME "IndexedDbChanged() - found match");
-
-		PostMessageA(_hwndWhatsappTray, WM_INDEXED_DB_CHANGED, 0, 0);
-	}
 }
 
 HWND startWhatsapp()

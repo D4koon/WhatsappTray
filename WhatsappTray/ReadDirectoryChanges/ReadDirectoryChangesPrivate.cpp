@@ -97,14 +97,14 @@ void CReadChangesRequest::BeginRead()
 
 	// This call needs to be reissued after every APC.
 	BOOL success = ::ReadDirectoryChangesW(
-		m_hDirectory,						// handle to directory
-		&m_Buffer[0],                       // read results buffer
-		m_Buffer.size(),                    // length of buffer
-		m_bIncludeChildren,                 // monitoring option
-		m_dwFilterFlags,                    // filter conditions
-		&dwBytes,                           // bytes returned
-		&m_Overlapped,                      // overlapped buffer
-		&NotificationCompletion);           // completion routine
+		m_hDirectory,						  // handle to directory
+		&m_Buffer[0],                         // read results buffer
+		static_cast<DWORD>(m_Buffer.size()),  // length of buffer
+		m_bIncludeChildren,                   // monitoring option
+		m_dwFilterFlags,                      // filter conditions
+		&dwBytes,                             // bytes returned
+		&m_Overlapped,                        // overlapped buffer
+		&NotificationCompletion);             // completion routine
 }
 
 //static
@@ -115,8 +115,7 @@ VOID CALLBACK CReadChangesRequest::NotificationCompletion(
 {
 	CReadChangesRequest* pBlock = (CReadChangesRequest*)lpOverlapped->hEvent;
 
-	if (dwErrorCode == ERROR_OPERATION_ABORTED)
-	{
+	if (dwErrorCode == ERROR_OPERATION_ABORTED) {
 		::InterlockedDecrement(&pBlock->m_pServer->m_nOutstandingRequests);
 		delete pBlock;
 		return;
@@ -127,8 +126,9 @@ VOID CALLBACK CReadChangesRequest::NotificationCompletion(
 	_ASSERTE(dwNumberOfBytesTransfered >= offsetof(FILE_NOTIFY_INFORMATION, FileName) + sizeof(WCHAR));
 
 	// This might mean overflow? Not sure.
-	if(!dwNumberOfBytesTransfered)
+	if (!dwNumberOfBytesTransfered) {
 		return;
+	}
 
 	pBlock->BackupBuffer(dwNumberOfBytesTransfered);
 
@@ -148,32 +148,34 @@ void CReadChangesRequest::ProcessNotification()
 	{
 		FILE_NOTIFY_INFORMATION& fni = (FILE_NOTIFY_INFORMATION&)*pBase;
 
-		CStringW wstrFilenameWide(fni.FileName, fni.FileNameLength/sizeof(wchar_t));
+		CStringW wstrFilenameWide(fni.FileName, fni.FileNameLength / sizeof(wchar_t));
 
 		// Handle a trailing backslash, such as for a root directory.
-		if (m_wstrDirectory.Right(1) != L"\\")
+		if (m_wstrDirectory.Right(1) != L"\\") {
 			wstrFilenameWide = m_wstrDirectory + L"\\" + wstrFilenameWide;
-		else
+		} else {
 			wstrFilenameWide = m_wstrDirectory + wstrFilenameWide;
+		}
 
 		// If it could be a short filename, expand it.
 		LPCWSTR wszFilename = PathFindFileNameW(wstrFilenameWide);
 		int len = lstrlenW(wszFilename);
 		// The maximum length of an 8.3 filename is twelve, including the dot.
-		if (len <= 12 && wcschr(wszFilename, L'~'))
-		{
+		if (len <= 12 && wcschr(wszFilename, L'~')) {
 			// Convert to the long filename form. Unfortunately, this
 			// does not work for deletions, so it's an imperfect fix.
 			wchar_t wbuf[MAX_PATH];
-			if (::GetLongPathNameW(wstrFilenameWide, wbuf, _countof(wbuf)) > 0)
+			if (::GetLongPathNameW(wstrFilenameWide, wbuf, _countof(wbuf)) > 0) {
 				wstrFilenameWide = wbuf;
+			}
 		}
 
 		CStringA wstrFilename = CW2A(wstrFilenameWide, CP_UTF8);
 		m_pServer->m_pBase->Push(fni.Action, wstrFilename);
 
-		if (!fni.NextEntryOffset)
+		if (!fni.NextEntryOffset) {
 			break;
+		}
 		pBase += fni.NextEntryOffset;
 	};
 }

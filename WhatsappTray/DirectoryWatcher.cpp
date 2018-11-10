@@ -39,17 +39,15 @@ void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
 		| FILE_NOTIFY_CHANGE_CREATION
 		| FILE_NOTIFY_CHANGE_FILE_NAME;
 
-
 	CReadDirectoryChanges changes;
 	changes.AddDirectory(directory.c_str(), false, dwNotificationFlags);
 
-	HANDLE hStdIn = ::GetStdHandle(STD_INPUT_HANDLE);
-	const HANDLE handles = changes.GetWaitHandle();
+	const HANDLE handle = changes.GetWaitHandle();
 
 	bool bTerminate = false;
 
 	while (!bTerminate) {
-		DWORD rc = ::WaitForSingleObjectEx(handles, INFINITE, true);
+		DWORD rc = ::WaitForSingleObjectEx(handle, INFINITE, true);
 		switch (rc) {
 		case WAIT_OBJECT_0 + 0:
 		{
@@ -60,7 +58,7 @@ void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
 				DWORD dwAction;
 				CStringA strFilename;
 				changes.Pop(dwAction, strFilename);
-				Logger::Debug("%s %s", ExplainAction(dwAction).c_str(), strFilename);
+				Logger::Debug("%s %s", CReadDirectoryChanges::ActionToString(dwAction).c_str(), strFilename);
 
 				directoryChangedEvent(dwAction, std::string(strFilename));
 			}
@@ -70,23 +68,5 @@ void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
 			// Nothing to do.
 			break;
 		}
-	}
-}
-
-std::string DirectoryWatcher::ExplainAction(DWORD dwAction)
-{
-	switch (dwAction) {
-	case FILE_ACTION_ADDED:
-		return "Added";
-	case FILE_ACTION_REMOVED:
-		return "Deleted";
-	case FILE_ACTION_MODIFIED:
-		return "Modified";
-	case FILE_ACTION_RENAMED_OLD_NAME:
-		return "Renamed From";
-	case FILE_ACTION_RENAMED_NEW_NAME:
-		return "Renamed To";
-	default:
-		return "BAD DATA";
 	}
 }

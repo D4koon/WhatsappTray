@@ -21,17 +21,19 @@
 
 #pragma once
 
-#include <string>
 #include <thread>
-#include <windef.h>
+
+class DirectoryWatcher;
 
 class WhatsAppApi
 {
 public:
-	WhatsAppApi(std::string directory, const std::function<void(const DWORD, std::string)>& callback);
+	WhatsAppApi() { }
 	~WhatsAppApi() { }
-	void WhatsAppApi::NotifyOnNewMessage(const std::function<void(const DWORD, std::string)>& newMessageHandler);
+	static void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& newMessageHandler);
 private:
-	const std::function<void(const DWORD, std::string)> newMessageEvent;
+	static std::unique_ptr<DirectoryWatcher> dirWatcher;
+	static void IndexedDbChanged(const DWORD dwAction, std::string strFilename);
+	static std::function<void()> newMessageEvent;
 };
 

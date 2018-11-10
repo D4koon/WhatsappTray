@@ -38,9 +38,9 @@ using namespace ReadDirectoryChangesPrivate;
 CReadDirectoryChanges::CReadDirectoryChanges(int nMaxCount)
 	: m_Notifications(nMaxCount)
 {
-	m_hThread	= NULL;
-	m_dwThreadId= 0;
-	m_pServer	= new CReadChangesServer(this);
+	m_hThread = NULL;
+	m_dwThreadId = 0;
+	m_pServer = new CReadChangesServer(this);
 }
 
 CReadDirectoryChanges::~CReadDirectoryChanges()
@@ -61,13 +61,12 @@ void CReadDirectoryChanges::Init()
 		m_pServer,
 		0,
 		&m_dwThreadId
-		);
+	);
 }
 
 void CReadDirectoryChanges::Terminate()
 {
-	if (m_hThread)
-	{
+	if (m_hThread) {
 		::QueueUserAPC(CReadChangesServer::TerminateProc, m_hThread, (ULONG_PTR)m_pServer);
 		::WaitForSingleObjectEx(m_hThread, 10000, true);
 		::CloseHandle(m_hThread);
@@ -77,25 +76,29 @@ void CReadDirectoryChanges::Terminate()
 	}
 }
 
-void CReadDirectoryChanges::AddDirectory( LPCTSTR szDirectory, BOOL bWatchSubtree, DWORD dwNotifyFilter, DWORD dwBufferSize )
+void CReadDirectoryChanges::AddDirectory(LPCTSTR szDirectory, BOOL bWatchSubtree, DWORD dwNotifyFilter, DWORD dwBufferSize)
 {
-	if (!m_hThread)
+	if (m_hThread == NULL) {
 		Init();
+	}
 
-	CReadChangesRequest* pRequest = new CReadChangesRequest(m_pServer, szDirectory, bWatchSubtree, dwNotifyFilter, dwBufferSize);
-	QueueUserAPC(CReadChangesServer::AddDirectoryProc, m_hThread, (ULONG_PTR)pRequest);
+	if (m_hThread != NULL) {
+		CReadChangesRequest* pRequest = new CReadChangesRequest(m_pServer, szDirectory, bWatchSubtree, dwNotifyFilter, dwBufferSize);
+		QueueUserAPC(CReadChangesServer::AddDirectoryProc, m_hThread, (ULONG_PTR)pRequest);
+	}
 }
 
 void CReadDirectoryChanges::Push(DWORD dwAction, CStringA& strFilename)
 {
-	m_Notifications.push( TDirectoryChangeNotification(dwAction, strFilename) );
+	m_Notifications.push(TDirectoryChangeNotification(dwAction, strFilename));
 }
 
 bool  CReadDirectoryChanges::Pop(DWORD& dwAction, CStringA& strFilename)
 {
 	TDirectoryChangeNotification pair;
-	if (!m_Notifications.pop(pair))
+	if (!m_Notifications.pop(pair)) {
 		return false;
+	}
 
 	dwAction = pair.first;
 	strFilename = pair.second;
@@ -106,7 +109,26 @@ bool  CReadDirectoryChanges::Pop(DWORD& dwAction, CStringA& strFilename)
 bool CReadDirectoryChanges::CheckOverflow()
 {
 	bool b = m_Notifications.overflow();
-	if (b)
+	if (b) {
 		m_Notifications.clear();
+	}
 	return b;
+}
+
+std::string CReadDirectoryChanges::ActionToString(int64_t actionType)
+{
+	switch (actionType) {
+	case FILE_ACTION_ADDED:
+		return "Added";
+	case FILE_ACTION_REMOVED:
+		return "Deleted";
+	case FILE_ACTION_MODIFIED:
+		return "Modified";
+	case FILE_ACTION_RENAMED_OLD_NAME:
+		return "Renamed From";
+	case FILE_ACTION_RENAMED_NEW_NAME:
+		return "Renamed To";
+	default:
+		return "BAD DATA";
+	}
 }

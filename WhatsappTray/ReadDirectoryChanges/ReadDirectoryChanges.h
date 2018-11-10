@@ -32,6 +32,7 @@
 #include "ThreadSafeQueue.h"
 #include <vector>
 #include <atlstr.h>
+#include <string>
 
 typedef std::pair<DWORD,CString> TDirectoryChangeNotification;
 
@@ -115,7 +116,7 @@ public:
 	/// ReadDirectoryChangesW call for the given directory with the given flags.
 	/// </para>
 	/// </remarks>
-	void AddDirectory( LPCTSTR wszDirectory, BOOL bWatchSubtree, DWORD dwNotifyFilter, DWORD dwBufferSize=16384 );
+	void AddDirectory(LPCTSTR wszDirectory, BOOL bWatchSubtree, DWORD dwNotifyFilter, DWORD dwBufferSize=16384);
 
 	/// <summary>
 	/// Return a handle for the Win32 Wait... functions that will be
@@ -133,6 +134,7 @@ public:
 
 	unsigned int GetThreadId() { return m_dwThreadId; }
 
+	static std::string ActionToString(int64_t actionType);
 protected:
 	ReadDirectoryChangesPrivate::CReadChangesServer* m_pServer;
 
