@@ -43,15 +43,17 @@ static HWND _hwndWhatsappTray;
 static HWND _hwndForMenu;
 static HWND _hwndWhatsapp;
 
-static bool closeToTray;
-
-/*
-* @brief If true the 'launch on windows startup'-feature is on.
-*/
-static bool launchOnWindowsStartup;
 static ApplicationData applicationData;
 static Registry registry;
 static std::unique_ptr<TrayManager> trayManager;
+
+#pragma WARNING(settings in applicationData?)
+//   Settings
+/*==============*/
+/// If true, the close-button of WhatsApp sends it to tray instead of closing.
+static bool closeToTray;
+/// If true the 'launch on windows startup'-feature is on.
+static bool launchOnWindowsStartup;
 
 LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 HWND startWhatsapp();
@@ -248,6 +250,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 		break;
 	case WM_TRAYCMD:
+#pragma WARNING(Das menue in TrayManager problem ist dass executeMenue...)
 		switch (static_cast<UINT>(lParam)) {
 		case NIN_SELECT:
 			trayManager->RestoreFromTray(wParam);

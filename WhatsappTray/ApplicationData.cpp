@@ -22,7 +22,6 @@
 
 #include "ApplicationData.h"
 
-#include <windows.h>
 #include <Shlobj.h>
 #include <sstream>
 #include <tchar.h>
@@ -40,7 +39,7 @@ bool ApplicationData::SetData(std::string key, bool value)
 	if (WritePrivateProfileString("config", key.c_str(), value ? "1" : "0", applicationDataFilePath.c_str()) == NULL) {
 		// We get here also when the folder does not exist.
 		std::stringstream message;
-		message << MODULE_NAME L"Saving application-data failed because the data could not be written in the settings file '" << applicationDataFilePath.c_str() << "'.";
+		message << MODULE_NAME "Saving application-data failed because the data could not be written in the settings file '" << applicationDataFilePath.c_str() << "'.";
 		MessageBox(NULL, message.str().c_str(), "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 		return false;
 	}
