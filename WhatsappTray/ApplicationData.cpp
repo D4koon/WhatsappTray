@@ -21,13 +21,14 @@
 #include "stdafx.h"
 
 #include "ApplicationData.h"
+#include "Logger.h"
 
 #include <Shlobj.h>
 #include <sstream>
 #include <tchar.h>
 
 #undef MODULE_NAME
-#define MODULE_NAME "[ApplicationData] "
+#define MODULE_NAME "ApplicationData::"
 
 /*
 * Set the data in the persistant storage.
@@ -39,7 +40,8 @@ bool ApplicationData::SetData(std::string key, bool value)
 	if (WritePrivateProfileString("config", key.c_str(), value ? "1" : "0", applicationDataFilePath.c_str()) == NULL) {
 		// We get here also when the folder does not exist.
 		std::stringstream message;
-		message << MODULE_NAME "Saving application-data failed because the data could not be written in the settings file '" << applicationDataFilePath.c_str() << "'.";
+		message << MODULE_NAME "SetData() - Saving application-data failed because the data could not be written in the settings file '" << applicationDataFilePath.c_str() << "'.";
+		Logger::Error(message.str().c_str());
 		MessageBox(NULL, message.str().c_str(), "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 		return false;
 	}
@@ -53,7 +55,8 @@ bool ApplicationData::GetDataOrSetDefault(std::string key, bool defaultValue)
 	TCHAR valueBuffer[200] = { 0 };
 	if (GetPrivateProfileString("config", key.c_str(), defaultValue ? "1" : "0", valueBuffer, sizeof(valueBuffer), applicationDataFilePath.c_str()) == NULL) {
 		std::stringstream message;
-		message << MODULE_NAME "Error while trying to read the settings file '" << applicationDataFilePath.c_str() << "'.";
+		message << MODULE_NAME "GetDataOrSetDefault() - Error while trying to read the settings file '" << applicationDataFilePath.c_str() << "'.";
+		Logger::Error(message.str().c_str());
 		MessageBox(NULL, message.str().c_str(), "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 		return defaultValue;
 	}
@@ -67,16 +70,18 @@ std::string ApplicationData::GetSettingsFile()
 {
 	TCHAR applicationDataDirectoryPath[MAX_PATH] = { 0 };
 	if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, applicationDataDirectoryPath) != S_OK) {
-		MessageBox(NULL, MODULE_NAME "Saving application-data failed because the path could not be received.", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		Logger::Error(MODULE_NAME "GetSettingsFile() - Saving application-data failed because the path could not be received.");
+		MessageBox(NULL, MODULE_NAME "GetSettingsFile() - Saving application-data failed because the path could not be received.", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 		return "";
 	}
 
 	// Create settings-filder if not exists.
 	_tcscat_s(applicationDataDirectoryPath, MAX_PATH, TEXT("\\WhatsappTray"));
 	if (CreateDirectory(applicationDataDirectoryPath, NULL) == NULL) {
-		// We can get here, if the folder already exists -> We dont want an error for that case ...
+		// We can get here, if the folder already exists -> We don't want an error for that case ...
 		if (GetLastError() != ERROR_ALREADY_EXISTS) {
-			MessageBox(NULL, MODULE_NAME "Saving application-data failed because the folder could not be created.", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+			Logger::Error(MODULE_NAME "GetSettingsFile() - Saving application-data failed because the folder could not be created.");
+			MessageBox(NULL, MODULE_NAME "GetSettingsFile() - Saving application-data failed because the folder could not be created.", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 			return "";
 		}
 	}
