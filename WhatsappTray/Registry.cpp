@@ -61,7 +61,7 @@ bool Registry::RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, 
 
 	if (args != NULL) {
 		// caller should make sure "args" is quoted if any single argument has a space
-		// e.g. (L"-name \"Mark Voidale\"");
+		// e.g. ("-name \"Mark Voidale\"");
 		_tcscat_s(szValue, count, args);
 	}
 

@@ -38,28 +38,28 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 	if (nCode >= 0) {
 		CWPSTRUCT *msg = (CWPSTRUCT*)lParam;
 
-		wchar_t buffer[2000];
-		//swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"CallWndRetProc message:%X", msg->message);
+		char buffer[2000];
+		//sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc message=0x%llX", msg->message);
 		//OutputDebugString(buffer);
 
 		if (msg->message == WM_SYSCOMMAND) {
 			// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
 			if (msg->wParam == SC_MINIMIZE) {
-				OutputDebugString(MODULE_NAME L"SC_MINIMIZE");
+				OutputDebugStringA(MODULE_NAME "SC_MINIMIZE");
 
 				// Ich prüfe hier noch ob der Fenstertitel übereinstimmt. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
 				// Ich könnte hier auch noch die klasse checken, das hat dann den vorteil, das es noch genauer ist.
 				// Sollte die Klasse von Whatsapp aus aber umbenannt werden muss ich hier wieder nachbesser.
 				// -> Daher lass ichs erstmal so...
 				if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
-					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)msg->hwnd);
+					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, reinterpret_cast<LPARAM>(msg->hwnd));
 				}
 			}
 		} else if (msg->message == WM_NCDESTROY) {
 			uintptr_t handle1 = reinterpret_cast<uintptr_t>(msg->hwnd);
 			uintptr_t handle2 = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
-			swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"WM_NCDESTROY hwnd=0x%llX findwindow=0x%llX", handle1, handle2);
-			OutputDebugString(buffer);
+			sprintf_s(buffer, sizeof(buffer), MODULE_NAME "WM_NCDESTROY hwnd=0x%llX findwindow=0x%llX", handle1, handle2);
+			OutputDebugStringA(buffer);
 
 			// Eigentlich sollte ich hier die gleichen probleme haben wie bei sc_minimize,
 			// Ich glaub aber das des zu einer zeit war wo noch ein globaler hook gemacht wurde...
@@ -68,9 +68,9 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 
 			// Ich machs jetz so dass ich wenn ich das Whatsapp-Fenster nicht finde auch schließe, wegen den oben genannten gruenden.
 			if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME) || FindWindow(NULL, WHATSAPP_CLIENT_NAME) == NULL) {
-				bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, (LPARAM)msg->hwnd);
+				bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, reinterpret_cast<LPARAM>(msg->hwnd));
 				if (successfulSent) {
-					OutputDebugString(MODULE_NAME L"WM_WHAHTSAPP_CLOSING successful sent.");
+					OutputDebugStringA(MODULE_NAME "WM_WHAHTSAPP_CLOSING successful sent.");
 				}
 			}
 		}
@@ -123,7 +123,7 @@ LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam) {
 					myfile << "\nMinimize";
 					myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
 
-					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)msg->hwnd);
+					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, reinterpret_cast<LPARAM>(msg->hwnd));
 				}
 				myfile.close();
 			}
@@ -183,7 +183,7 @@ LRESULT CALLBACK MouseProc(
 			bool mouseOnClosebutton = PtInRect(&rect, mhs->pt);
 
 			if (mouseOnClosebutton) {
-				//OutputDebugString(MODULE_NAME L"Closebutton mousedown");
+				//OutputDebugStringA(MODULE_NAME "Closebutton mousedown");
 				//myfile << "\nMinimize";
 				//myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
 
@@ -203,7 +203,7 @@ BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
 {
 	_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
 	if (_hWndProc == NULL) {
-		OutputDebugString(MODULE_NAME L"RegisterHook() - Error Creation Hook _hWndProc\n");
+		OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
 		UnRegisterHook();
 		return FALSE;
 	}
@@ -211,7 +211,7 @@ BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
 	if (closeToTray) {
 		_mouseProc = SetWindowsHookEx(WH_MOUSE, (HOOKPROC)MouseProc, hLib, threadId);
 		if (_mouseProc == NULL) {
-			OutputDebugString(MODULE_NAME L"RegisterHook() - Error Creation Hook _hWndProc\n");
+			OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
 			UnRegisterHook();
 			return FALSE;
 		}
