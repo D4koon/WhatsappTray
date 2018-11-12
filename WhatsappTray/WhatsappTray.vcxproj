@@ -109,7 +109,7 @@
       <EnableCOMDATFolding>
       </EnableCOMDATFolding>
       <TargetMachine>MachineX64</TargetMachine>
-      <AdditionalDependencies>Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <BuildLog>
       <Path>$(IntDir)Buildlog\$(MSBuildProjectName).log</Path>
@@ -134,6 +134,7 @@
   <ItemGroup>
     <ClInclude Include="ApplicationData.h" />
     <ClInclude Include="DirectoryWatcher.h" />
+    <ClInclude Include="Enum.h" />
     <ClInclude Include="Helper.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="ReadDirectoryChanges\ReadDirectoryChanges.h" />

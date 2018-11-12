@@ -23,6 +23,7 @@
 
 #include "Registry.h"
 #include "Helper.h"
+#include "Logger.h"
 
 #include <tchar.h>
 #include <exception>
@@ -67,23 +68,29 @@ bool Registry::RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, 
 
 	lResult = RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), 0, NULL, 0, (KEY_WRITE | KEY_READ), NULL, &hKey, NULL);
 
-	fSuccess = (lResult == 0);
-
-	if (fSuccess) {
-		if ((_tcslen(szValue) + 1) * 2 > ULONG_MAX) {
-			throw std::exception("Registry::RegisterMyProgramForStartup() - String is too long.");
-		}
-		dwSize = static_cast<DWORD>((_tcslen(szValue) + 1) * 2);
-		lResult = RegSetValueEx(hKey, pszAppName, 0, REG_SZ, (BYTE*)szValue, dwSize);
-		fSuccess = (lResult == 0);
+	if (lResult != 0) {
+		Logger::Error("Registry::RegisterMyProgramForStartup() - Regestry-key could not been created.");
+		return false;
 	}
+
+	if ((_tcslen(szValue) + 1) * 2 > ULONG_MAX) {
+		Logger::Error("Registry::RegisterMyProgramForStartup() - String is too long.");
+		throw std::exception("Registry::RegisterMyProgramForStartup() - String is too long.");
+	}
+
+	dwSize = static_cast<DWORD>((_tcslen(szValue) + 1) * 2);
+	lResult = RegSetValueEx(hKey, pszAppName, 0, REG_SZ, (BYTE*)szValue, dwSize);
 
 	if (hKey != NULL) {
 		RegCloseKey(hKey);
-		hKey = NULL;
 	}
 
-	return fSuccess;
+	if (lResult != 0) {
+		Logger::Error("Registry::RegisterMyProgramForStartup() - Could not set value of regestry-key.");
+		return false;
+	}
+
+	return (lResult == 0);
 }
 
 /*

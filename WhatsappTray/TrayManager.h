@@ -35,15 +35,15 @@ public:
 	void RestoreFromTray(uintptr_t index);
 	void RestoreWindowFromTray(HWND hwnd);
 	void RefreshWindowInTray(HWND hwnd);
+	void SetIcon(HWND hwnd);
 	HWND GetHwndFromIndex(uintptr_t index);
 	~TrayManager() { }
 private:
 	static const int MAXTRAYITEMS = 64;
 
 	/// The windows that are currently minimized to tray.
-	//std::vector<HWND> trayItems;
-	HWND _hwndItems[MAXTRAYITEMS];
 	HWND _hwndWhatsappTray;
+	HWND _hwndItems[MAXTRAYITEMS];
 
 	void AddWindowToTray(HWND hwnd);
 	void CreateTrayIcon(int32_t index, HWND hwnd);

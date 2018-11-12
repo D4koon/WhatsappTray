@@ -26,9 +26,19 @@
 #include <Shlobj.h>
 #include <sstream>
 #include <tchar.h>
+#include <string>
 
 #undef MODULE_NAME
 #define MODULE_NAME "ApplicationData::"
+
+#pragma WARNING(NEEDS CLEANUP)
+ApplicationData::ApplicationData()
+	: closeToTray(false, Data::CLOSE_TO_TRAY)
+	, launchOnWindowsStartup(false, Data::LAUNCH_ON_WINDOWS_STARTUP)
+{
+	closeToTray.Value = GetDataOrSetDefault(closeToTray.Info.toString(), closeToTray.DefaultValue);
+	launchOnWindowsStartup.Value = GetDataOrSetDefault(launchOnWindowsStartup.Info.toString(), launchOnWindowsStartup.DefaultValue);
+}
 
 /*
 * Set the data in the persistant storage.
@@ -46,6 +56,29 @@ bool ApplicationData::SetData(std::string key, bool value)
 		return false;
 	}
 	return true;
+}
+
+bool ApplicationData::GetCloseToTray()
+{
+	return closeToTray.Value;
+}
+
+void ApplicationData::SetCloseToTray(bool value)
+{
+	closeToTray.Value = value;
+	// Write data to persistant storage.
+	SetData("CLOSE_TO_TRAY", value);
+}
+
+bool ApplicationData::GetLaunchOnWindowsStartup()
+{
+	return launchOnWindowsStartup.Value;
+}
+
+void ApplicationData::SetLaunchOnWindowsStartup(bool value)
+{
+	launchOnWindowsStartup.Value = value;
+	SetData("LAUNCH_ON_WINDOWS_STARTUP", value);
 }
 
 bool ApplicationData::GetDataOrSetDefault(std::string key, bool defaultValue)

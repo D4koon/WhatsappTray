@@ -31,6 +31,7 @@
 
 TrayManager::TrayManager(HWND _hwndWhatsappTray)
 	: _hwndWhatsappTray(_hwndWhatsappTray)
+	, _hwndItems { 0 }
 {
 }
 
@@ -170,11 +171,40 @@ void TrayManager::RefreshWindowInTray(HWND hwnd)
 		ZeroMemory(&nid, sizeof(nid));
 		nid.cbSize = NOTIFYICONDATA_V2_SIZE;
 		nid.hWnd = _hwndWhatsappTray;
-		nid.uID = (UINT)index;
+		nid.uID = static_cast<UINT>(index);
 		nid.uFlags = NIF_TIP;
 		GetWindowText(hwnd, nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
 		Shell_NotifyIcon(NIM_MODIFY, &nid);
 	}
+}
+
+void TrayManager::SetIcon(HWND hwnd)
+{
+	int32_t index = GetIndexFromWindowHandle(hwnd);
+	if (index == -1) {
+		return;
+	}
+
+	NOTIFYICONDATA nid;
+	ZeroMemory(&nid, sizeof(nid));
+	nid.cbSize = NOTIFYICONDATA_V2_SIZE;
+	nid.hWnd = _hwndWhatsappTray;
+	nid.uID = static_cast<UINT>(index);
+	nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+	nid.uCallbackMessage = WM_TRAYCMD;
+	nid.hIcon = (HICON)LoadImage( // returns a HANDLE so we have to cast to HICON
+		NULL,             // hInstance must be NULL when loading from a file
+		"app2.ico",   // the icon file name
+		IMAGE_ICON,       // specifies that the file is an icon
+		0,                // width of the image (we'll specify default later on)
+		0,                // height of the image
+		LR_LOADFROMFILE |  // we want to load a file (as opposed to a resource)
+		LR_DEFAULTSIZE |   // default metrics based on the type (IMAGE_ICON, 32x32)
+		LR_SHARED         // let the system release the handle when it's no longer used
+	);
+	GetWindowText(hwnd, nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
+	nid.uVersion = NOTIFYICON_VERSION;
+	Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
 HWND TrayManager::GetHwndFromIndex(uintptr_t index)

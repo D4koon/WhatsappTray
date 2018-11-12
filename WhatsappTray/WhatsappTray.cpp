@@ -39,43 +39,31 @@
 static HINSTANCE _hInstance;
 static HMODULE _hLib;
 static HWND _hwndWhatsappTray;
-
 static HWND _hwndForMenu;
 static HWND _hwndWhatsapp;
 
-static ApplicationData applicationData;
+static ApplicationData appData;
 static Registry registry;
 static std::unique_ptr<TrayManager> trayManager;
 
-#pragma WARNING(settings in applicationData?)
-//   Settings
-/*==============*/
-/// If true, the close-button of WhatsApp sends it to tray instead of closing.
-static bool closeToTray;
-/// If true the 'launch on windows startup'-feature is on.
-static bool launchOnWindowsStartup;
 
 LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 HWND startWhatsapp();
 bool setHook();
 void setLaunchOnWindowsStartupSetting(bool value);
 
-int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_  HINSTANCE hPrevInstance, _In_  LPSTR lpCmdLine, _In_  int nShowCmd)
+int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
 	Logger::Setup();
 
 	_hInstance = hInstance;
 
-	// Read the settings from the persistan storage.
-	closeToTray = applicationData.GetDataOrSetDefault("CLOSE_TO_TRAY", false);
 	// Setup the settings for launch on windows startup.
-	setLaunchOnWindowsStartupSetting(applicationData.GetDataOrSetDefault("LAUNCH_ON_WINDOWS_STARTUP", false));
+	setLaunchOnWindowsStartupSetting(appData.GetLaunchOnWindowsStartup());
 
 	// Check if closeToTray was set per commandline. (this overrides the persistent storage-value.)
 	if (strstr(lpCmdLine, "--closeToTray")) {
-		closeToTray = true;
-		// Write data to persistant storage.
-		applicationData.SetData("CLOSE_TO_TRAY", closeToTray);
+		appData.SetCloseToTray(true);
 	}
 	if (!(_hLib = LoadLibrary("Hook.dll"))) {
 		MessageBox(NULL, "Error loading Hook.dll.", "WhatsappTray", MB_OK | MB_ICONERROR);
@@ -154,14 +142,14 @@ void ExecuteMenu()
 	// - Display options.
 
 	// -- Close to Tray
-	if (closeToTray) {
+	if (appData.GetCloseToTray()) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_CLOSE_TO_TRAY, "Close to tray");
 	} else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_CLOSE_TO_TRAY, "Close to tray");
 	}
 
 	// -- Launch on Windows startup.
-	if (launchOnWindowsStartup) {
+	if (appData.GetLaunchOnWindowsStartup()) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
 	} else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
@@ -217,16 +205,14 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		{
 			// Toggle the 'close to tray'-feature.
 			// We have to first change the value and then unregister and register to set the ne value in the hook.
-			closeToTray = !closeToTray;
-			// Write data to persistant storage.
-			applicationData.SetData("CLOSE_TO_TRAY", closeToTray);
+			appData.SetCloseToTray(!appData.GetCloseToTray());
 
 			SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
 			break;
 		}
 		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP:
 			// Toggle the 'launch on windows startup'-feature.
-			setLaunchOnWindowsStartupSetting(!launchOnWindowsStartup);
+			setLaunchOnWindowsStartupSetting(!appData.GetLaunchOnWindowsStartup());
 			break;
 		case IDM_RESTORE:
 			Logger::Info(MODULE_NAME "IDM_RESTORE");
@@ -250,7 +236,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 		break;
 	case WM_TRAYCMD:
-#pragma WARNING(Das menue in TrayManager problem ist dass executeMenue...)
+#pragma WARNING(Move into TrayManager. Problem is executeMenue...)
 		switch (static_cast<UINT>(lParam)) {
 		case NIN_SELECT:
 			trayManager->RestoreFromTray(wParam);
@@ -282,8 +268,9 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		Logger::Info(MODULE_NAME "QuitMessage posted.");
 		break;
 	case WM_INDEXED_DB_CHANGED:
-		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXIT, NULL, SND_ALIAS_ID);
+		//PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXIT, NULL, SND_ALIAS_ID);
 		Logger::Info(MODULE_NAME "WM_INDEXED_DB_CHANGED");
+		trayManager->SetIcon(_hwndWhatsapp);
 		break;
 	}
 
@@ -339,7 +326,7 @@ bool setHook()
 		return false;
 	}
 
-	if (RegisterHook(_hLib, threadId, closeToTray) == false) {
+	if (RegisterHook(_hLib, threadId, appData.GetCloseToTray()) == false) {
 		MessageBox(NULL, "Error setting hook procedure.", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return false;
 	}
@@ -351,9 +338,7 @@ bool setHook()
  */
 void setLaunchOnWindowsStartupSetting(bool value)
 {
-	launchOnWindowsStartup = value;
-	// Write data to persistant storage.
-	applicationData.SetData("LAUNCH_ON_WINDOWS_STARTUP", value);
+	appData.SetLaunchOnWindowsStartup(value);
 
 	if (value) {
 		registry.RegisterProgram();

@@ -64,8 +64,6 @@ void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::string strFilename
 			return;
 		}
 
-		PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXIT, NULL, SND_ALIAS_ID);
-
 		for (size_t lineCounter = 0; true; ) {
 			int character = file.get();
 
