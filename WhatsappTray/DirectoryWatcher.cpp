@@ -29,7 +29,15 @@ DirectoryWatcher::DirectoryWatcher(std::string directory, const std::function<vo
 	: watchedDirectory(directory)
 	, directoryChangedEvent(directoryChangedHandler)
 	, watcherThread(&DirectoryWatcher::WatchDirectoryWorker, this, directory)
+	, terminate(false)
+	, WaitHandle()
 {
+}
+
+DirectoryWatcher::~DirectoryWatcher()
+{
+	// We need to wait for the thread to finish to not trigger an exception.
+	StopThread();
 }
 
 void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
@@ -42,12 +50,13 @@ void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
 	CReadDirectoryChanges changes;
 	changes.AddDirectory(directory.c_str(), false, dwNotificationFlags);
 
-	const HANDLE handle = changes.GetWaitHandle();
+	WaitHandle = changes.GetWaitHandle();
 
-	bool bTerminate = false;
-
-	while (!bTerminate) {
-		DWORD rc = ::WaitForSingleObjectEx(handle, INFINITE, true);
+	while (true) {
+		DWORD rc = ::WaitForSingleObjectEx(WaitHandle, INFINITE, true);
+		if (terminate) {
+			return;
+		}
 		switch (rc) {
 		case WAIT_OBJECT_0 + 0:
 		{
@@ -69,4 +78,11 @@ void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
 			break;
 		}
 	}
+}
+
+void DirectoryWatcher::StopThread()
+{
+	terminate = true;
+	SetEvent(WaitHandle);
+	watcherThread.join();
 }

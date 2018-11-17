@@ -29,12 +29,15 @@ class DirectoryWatcher
 {
 public:
 	DirectoryWatcher(std::string directory, const std::function<void(const DWORD, std::string)>& directoryChangedHandler);
-	~DirectoryWatcher() { }
+	~DirectoryWatcher();
 private:
 	std::string watchedDirectory;
 	const std::function<void(const DWORD, std::string)> directoryChangedEvent;
 	std::thread watcherThread;
+	bool terminate;
+	HANDLE WaitHandle;
 
 	void WatchDirectoryWorker(std::string directory);
+	void StopThread();
 };
 

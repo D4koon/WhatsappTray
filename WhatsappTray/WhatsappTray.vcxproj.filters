@@ -68,6 +68,9 @@
     <ClInclude Include="Enum.h">
       <Filter>Files\Helper</Filter>
     </ClInclude>
+    <ClInclude Include="AboutDialog.h">
+      <Filter>Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ApplicationData.cpp">
@@ -102,6 +105,9 @@
     </ClCompile>
     <ClCompile Include="Helper.cpp">
       <Filter>Files\Helper</Filter>
+    </ClCompile>
+    <ClCompile Include="AboutDialog.cpp">
+      <Filter>Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

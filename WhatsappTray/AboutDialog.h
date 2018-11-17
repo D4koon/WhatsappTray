@@ -23,30 +23,15 @@
 
 #include <stdint.h>
 
-class TrayManager
+class AboutDialog
 {
 public:
-	TrayManager(HWND _hwndWhatsappTray);
-	~TrayManager() { }
-	void MinimizeWindowToTray(HWND hwnd);
-	void CloseWindowFromTray(HWND hwnd);
-	void RemoveTrayIcon(HWND hwnd);
-	void RemoveFromTray(int32_t index);
-	void RestoreAllWindowsFromTray();
-	void RestoreFromTray(uintptr_t index);
-	void RestoreWindowFromTray(HWND hwnd);
-	void RefreshWindowInTray(HWND hwnd);
-	void SetIcon(HWND hwnd);
-	HWND GetHwndFromIndex(uintptr_t index);
+	AboutDialog() { }
+	~AboutDialog() { }
+	static void Create(_In_opt_ HINSTANCE hInstance, HWND _hwndWhatsappTray);
+	static INT_PTR DlgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+	
 private:
-	static const int MAXTRAYITEMS = 64;
 
-	/// The windows that are currently minimized to tray.
-	HWND _hwndWhatsappTray;
-	HWND _hwndItems[MAXTRAYITEMS];
-
-	void AddWindowToTray(HWND hwnd);
-	void CreateTrayIcon(int32_t index, HWND hwnd);
-	int32_t GetIndexFromWindowHandle(HWND hwnd);
 };
 

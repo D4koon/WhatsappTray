@@ -25,7 +25,7 @@
 #include "Logger.h"
 
 #include <vector>
-#include <cassert>
+#include <sstream>
 
 /*
 * @brief Get the Path to the exe-file of the application.
@@ -110,4 +110,47 @@ HICON Helper::GetWindowIcon(HWND hwnd)
 	if (icon = (HICON)GetClassLongPtr(hwnd, GCLP_HICONSM)) return icon;
 	if (icon = (HICON)GetClassLongPtr(hwnd, GCLP_HICON)) return icon;
 	return LoadIcon(NULL, IDI_WINLOGO);
+}
+
+// From: https://stackoverflow.com/questions/7028304/error-lnk2019-when-using-getfileversioninfosize
+std::string Helper::GetProductAndVersion()
+{
+	// get the filename of the executable containing the version resource
+	TCHAR szFilename[MAX_PATH + 1] = { 0 };
+	if (GetModuleFileName(NULL, szFilename, MAX_PATH) == 0) {
+		Logger::Error("GetModuleFileName failed with error %d", GetLastError());
+		return "";
+	}
+
+	// allocate a block of memory for the version info
+	DWORD dummy;
+	DWORD dwSize = GetFileVersionInfoSize(szFilename, &dummy);
+	if (dwSize == 0) {
+		Logger::Error("GetFileVersionInfoSize failed with error %d", GetLastError());
+		return "";
+	}
+	std::vector<BYTE> data(dwSize);
+
+	// load the version info
+	if (!GetFileVersionInfo(szFilename, NULL, dwSize, &data[0])) {
+		Logger::Error("GetFileVersionInfo failed with error %d", GetLastError());
+		return "";
+	}
+
+	// get the version strings
+	LPVOID pvProductVersion = NULL;
+	unsigned int iProductVersionLen = 0;
+
+	UINT                uiVerLen = 0;
+	VS_FIXEDFILEINFO*   pFixedInfo = 0;     // pointer to fixed file info structure
+	// get the fixed file info (language-independent) 
+	if (VerQueryValue(&data[0], TEXT("\\"), (void**)&pFixedInfo, (UINT *)&uiVerLen) == 0) {
+		Logger::Error("Can't obtain ProductVersion from resources");
+		return "";
+	}
+
+	std::stringstream stringStream;
+	stringStream << HIWORD(pFixedInfo->dwProductVersionMS) << "." << LOWORD(pFixedInfo->dwProductVersionMS) << "." << HIWORD(pFixedInfo->dwProductVersionLS) << "." << LOWORD(pFixedInfo->dwProductVersionLS);
+
+	return stringStream.str();
 }

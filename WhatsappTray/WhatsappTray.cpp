@@ -27,6 +27,7 @@
 #include "Registry.h"
 #include "WhatsAppApi.h"
 #include "TrayManager.h"
+#include "AboutDialog.h"
 #include "Helper.h"
 #include "Logger.h"
 
@@ -45,7 +46,6 @@ static HWND _hwndWhatsapp;
 static ApplicationData appData;
 static Registry registry;
 static std::unique_ptr<TrayManager> trayManager;
-
 
 LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 HWND startWhatsapp();
@@ -170,27 +170,6 @@ void ExecuteMenu()
 	DestroyMenu(hMenu);
 }
 
-BOOL CALLBACK AboutDlgProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
-	switch (Msg) {
-	case WM_CLOSE:
-		PostMessage(hWnd, WM_COMMAND, IDCANCEL, 0);
-		break;
-	case WM_COMMAND:
-		switch (LOWORD(wParam)) {
-		case IDOK:
-			EndDialog(hWnd, TRUE);
-			break;
-		case IDCANCEL:
-			EndDialog(hWnd, FALSE);
-			break;
-		}
-		break;
-	default:
-		return FALSE;
-	}
-	return TRUE;
-}
-
 LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	Logger::Info(MODULE_NAME "HookWndProc() - Message Received msg='0x%X'", msg);
@@ -199,7 +178,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
 		case IDM_ABOUT:
-			DialogBox(_hInstance, MAKEINTRESOURCE(IDD_ABOUT), _hwndWhatsappTray, (DLGPROC)AboutDlgProc);
+			AboutDialog::Create(_hInstance, _hwndWhatsappTray);
 			break;
 		case IDM_SETTING_CLOSE_TO_TRAY:
 		{

@@ -21,6 +21,9 @@
 
 #pragma once
 
+// Include lib for GetFileVersionInfoSize()
+#pragma comment(lib,"Version.lib")
+
 #include <string>
 
 class Helper
@@ -34,5 +37,6 @@ public:
 	static std::wstring Helper::ToWString(const std::string& s);
 	static std::string Helper::ToString(const std::wstring& s);
 	static HICON GetWindowIcon(HWND hwnd);
+	static std::string GetProductAndVersion();
 };
 
