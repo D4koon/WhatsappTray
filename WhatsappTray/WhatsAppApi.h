@@ -1,7 +1,7 @@
 /*
 *
 * WhatsappTray
-* Copyright (C) 1998-2018 Sebastian Amann
+* Copyright (C) 1998-2018  Sebastian Amann
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -21,18 +21,19 @@
 
 #pragma once
 
-#include <Windows.h>
+#include <thread>
 
-class Registry
+class DirectoryWatcher;
+
+class WhatsAppApi
 {
 public:
-	Registry() { }
-	~Registry() { }
-	void RegisterProgram();
-	bool RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args);
-	bool IsMyProgramRegisteredForStartup(LPTSTR pszAppName);
-	void UnregisterProgram();
+	WhatsAppApi() { }
+	~WhatsAppApi() { }
+	static void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& newMessageHandler);
 private:
-	static const LPTSTR applicatinName;
+	static std::unique_ptr<DirectoryWatcher> dirWatcher;
+	static void IndexedDbChanged(const DWORD dwAction, std::string strFilename);
+	static std::function<void()> newMessageEvent;
 };
 

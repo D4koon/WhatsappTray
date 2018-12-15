@@ -20,16 +20,47 @@
 */
 
 #pragma once
+//#define BETTER_ENUMS_NO_CONSTEXPR
+#include "Enum.h"
+
 #include <string>
+#include <map>
+
+BETTER_ENUM(Data, uint8_t, 
+	CLOSE_TO_TRAY,
+	LAUNCH_ON_WINDOWS_STARTUP
+)
+
+class DataSetBool
+{
+public:
+	DataSetBool(const bool defaultValue, const Data info)
+		: Value(defaultValue)
+		, DefaultValue(defaultValue)
+		, Info(info)
+	{
+	}
+	bool Value;
+	const bool DefaultValue;
+	const Data Info;
+};
 
 class ApplicationData
 {
 public:
 	ApplicationData();
-	~ApplicationData();
-	bool SetData(std::wstring key, bool value);
-	bool GetDataOrSetDefault(std::wstring key, bool defaultValue);
+	~ApplicationData() {}
+	bool SetData(std::string key, bool value);
+	bool GetCloseToTray();
+	void SetCloseToTray(bool value);
+	bool GetLaunchOnWindowsStartup();
+	void SetLaunchOnWindowsStartup(bool value);
+	bool GetDataOrSetDefault(std::string key, bool defaultValue);
 private:
-	std::wstring GetSettingsFile();
+	std::string GetSettingsFile();
+	
+	/// If true, the close-button of WhatsApp sends it to tray instead of closing.
+	DataSetBool closeToTray;
+	DataSetBool launchOnWindowsStartup;
 };
 

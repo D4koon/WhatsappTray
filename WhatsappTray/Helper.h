@@ -21,18 +21,22 @@
 
 #pragma once
 
-#include <Windows.h>
+// Include lib for GetFileVersionInfoSize()
+#pragma comment(lib,"Version.lib")
 
-class Registry
+#include <string>
+
+class Helper
 {
 public:
-	Registry() { }
-	~Registry() { }
-	void RegisterProgram();
-	bool RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args);
-	bool IsMyProgramRegisteredForStartup(LPTSTR pszAppName);
-	void UnregisterProgram();
-private:
-	static const LPTSTR applicatinName;
+	Helper() { }
+	~Helper() { }
+
+	static std::string Helper::GetApplicationFilePath();
+	static std::string GetApplicationDirectory();
+	static std::wstring Helper::ToWString(const std::string& s);
+	static std::string Helper::ToString(const std::wstring& s);
+	static HICON GetWindowIcon(HWND hwnd);
+	static std::string GetProductAndVersion();
 };
 

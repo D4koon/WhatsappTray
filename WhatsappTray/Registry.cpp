@@ -1,36 +1,34 @@
 /*
- * 
- * WhatsappTray
- * Copyright (C) 1998-2017  Sebastian Amann
- * 
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- * 
- */
+* 
+* WhatsappTray
+* Copyright (C) 1998-2018 Sebastian Amann
+* 
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 2 of the License, or
+* (at your option) any later version.
+* 
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+* 
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+* 
+*/
+
+#include "stdafx.h"
 
 #include "Registry.h"
+#include "Helper.h"
+#include "Logger.h"
 
-const wchar_t* Registry::applicatinName = L"WhatsappTray";
+#include <tchar.h>
+#include <exception>
 
-Registry::Registry()
-{
-}
-
-
-Registry::~Registry()
-{
-}
+const LPTSTR Registry::applicatinName = TEXT("WhatsappTray");
 
 /*
 * @brief Creates an entry in the registry to run WhatsappTray on startup.
@@ -38,17 +36,17 @@ Registry::~Registry()
 void Registry::RegisterProgram()
 {
 	// Get the path to WhatsappTray.
-	wchar_t szPathToExe[MAX_PATH];
-	GetModuleFileNameW(NULL, szPathToExe, MAX_PATH);
+	TCHAR szPathToExe[MAX_PATH];
+	GetModuleFileName(NULL, szPathToExe, MAX_PATH);
 
 	// Set the autostart in registry.
-	RegisterMyProgramForStartup(applicatinName, szPathToExe, L"");
+	RegisterMyProgramForStartup(applicatinName, szPathToExe, TEXT(""));
 }
 
 /*
 * @brief Creates an entry in the registry to run \p pszAppName on startup.
 */
-bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, PCWSTR args)
+bool Registry::RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args)
 {
 	HKEY hKey = NULL;
 	LONG lResult = 0;
@@ -56,43 +54,49 @@ bool Registry::RegisterMyProgramForStartup(PCWSTR pszAppName, PCWSTR pathToExe, 
 	DWORD dwSize;
 
 	const size_t count = MAX_PATH * 2;
-	wchar_t szValue[count] = { 0 };
+	TCHAR szValue[count] = { 0 };
 
-	wcscpy_s(szValue, count, L"\"");
-	wcscat_s(szValue, count, pathToExe);
-	wcscat_s(szValue, count, L"\" ");
+	_tcscpy_s(szValue, count, TEXT("\""));
+	_tcscat_s(szValue, count, pathToExe);
+	_tcscat_s(szValue, count, TEXT("\" "));
 
-	if (args != NULL)
-	{
+	if (args != NULL) {
 		// caller should make sure "args" is quoted if any single argument has a space
-		// e.g. (L"-name \"Mark Voidale\"");
-		wcscat_s(szValue, count, args);
+		// e.g. ("-name \"Mark Voidale\"");
+		_tcscat_s(szValue, count, args);
 	}
 
-	lResult = RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, NULL, 0, (KEY_WRITE | KEY_READ), NULL, &hKey, NULL);
+	lResult = RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), 0, NULL, 0, (KEY_WRITE | KEY_READ), NULL, &hKey, NULL);
 
-	fSuccess = (lResult == 0);
-
-	if (fSuccess)
-	{
-		dwSize = (wcslen(szValue) + 1) * 2;
-		lResult = RegSetValueExW(hKey, pszAppName, 0, REG_SZ, (BYTE*)szValue, dwSize);
-		fSuccess = (lResult == 0);
+	if (lResult != 0) {
+		Logger::Error("Registry::RegisterMyProgramForStartup() - Regestry-key could not been created.");
+		return false;
 	}
 
-	if (hKey != NULL)
-	{
+	if ((_tcslen(szValue) + 1) * 2 > ULONG_MAX) {
+		Logger::Error("Registry::RegisterMyProgramForStartup() - String is too long.");
+		throw std::exception("Registry::RegisterMyProgramForStartup() - String is too long.");
+	}
+
+	dwSize = static_cast<DWORD>((_tcslen(szValue) + 1) * 2);
+	lResult = RegSetValueEx(hKey, pszAppName, 0, REG_SZ, (BYTE*)szValue, dwSize);
+
+	if (hKey != NULL) {
 		RegCloseKey(hKey);
-		hKey = NULL;
 	}
 
-	return fSuccess;
+	if (lResult != 0) {
+		Logger::Error("Registry::RegisterMyProgramForStartup() - Could not set value of regestry-key.");
+		return false;
+	}
+
+	return (lResult == 0);
 }
 
 /*
 * @brief Returns true if the autorun entry for WhatsappTray exists in the registry.
 */
-bool Registry::IsMyProgramRegisteredForStartup(PCWSTR pszAppName)
+bool Registry::IsMyProgramRegisteredForStartup(LPTSTR pszAppName)
 {
 	HKEY hKey = NULL;
 	LONG lResult = 0;
@@ -101,23 +105,20 @@ bool Registry::IsMyProgramRegisteredForStartup(PCWSTR pszAppName)
 	wchar_t szPathToExe[MAX_PATH] = { 0 };
 	DWORD dwSize = sizeof(szPathToExe);
 
-	lResult = RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey);
+	lResult = RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), 0, KEY_READ, &hKey);
 
 	fSuccess = (lResult == 0);
 
-	if (fSuccess)
-	{
-		lResult = RegGetValueW(hKey, NULL, pszAppName, RRF_RT_REG_SZ, &dwRegType, szPathToExe, &dwSize);
+	if (fSuccess) {
+		lResult = RegGetValue(hKey, NULL, pszAppName, RRF_RT_REG_SZ, &dwRegType, szPathToExe, &dwSize);
 		fSuccess = (lResult == 0);
 	}
 
-	if (fSuccess)
-	{
+	if (fSuccess) {
 		fSuccess = (wcslen(szPathToExe) > 0) ? TRUE : FALSE;
 	}
 
-	if (hKey != NULL)
-	{
+	if (hKey != NULL) {
 		RegCloseKey(hKey);
 		hKey = NULL;
 	}
@@ -130,5 +131,5 @@ bool Registry::IsMyProgramRegisteredForStartup(PCWSTR pszAppName)
 */
 void Registry::UnregisterProgram()
 {
-	RegDeleteKeyValue(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", applicatinName);
+	RegDeleteKeyValue(HKEY_CURRENT_USER, TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), applicatinName);
 }

@@ -1,7 +1,7 @@
 /*
 *
 * WhatsappTray
-* Copyright (C) 1998-2018 Sebastian Amann
+* Copyright (C) 1998-2018  Sebastian Amann
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -21,18 +21,23 @@
 
 #pragma once
 
-#include <Windows.h>
+#include <string>
+#include <thread>
+#include <windef.h>
 
-class Registry
+class DirectoryWatcher
 {
 public:
-	Registry() { }
-	~Registry() { }
-	void RegisterProgram();
-	bool RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args);
-	bool IsMyProgramRegisteredForStartup(LPTSTR pszAppName);
-	void UnregisterProgram();
+	DirectoryWatcher(std::string directory, const std::function<void(const DWORD, std::string)>& directoryChangedHandler);
+	~DirectoryWatcher();
 private:
-	static const LPTSTR applicatinName;
+	std::string watchedDirectory;
+	const std::function<void(const DWORD, std::string)> directoryChangedEvent;
+	std::thread watcherThread;
+	bool terminate;
+	HANDLE WaitHandle;
+
+	void WatchDirectoryWorker(std::string directory);
+	void StopThread();
 };
 

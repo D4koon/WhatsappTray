@@ -18,82 +18,108 @@
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 *
 */
+#include "stdafx.h"
 
 #include "ApplicationData.h"
-#include <windows.h>
+#include "Logger.h"
+
 #include <Shlobj.h>
 #include <sstream>
+#include <tchar.h>
+#include <string>
 
 #undef MODULE_NAME
-#define MODULE_NAME "[ApplicationData] "
+#define MODULE_NAME "ApplicationData::"
 
+#pragma WARNING(NEEDS CLEANUP)
 ApplicationData::ApplicationData()
+	: closeToTray(false, Data::CLOSE_TO_TRAY)
+	, launchOnWindowsStartup(false, Data::LAUNCH_ON_WINDOWS_STARTUP)
 {
-}
-
-
-ApplicationData::~ApplicationData()
-{
+	closeToTray.Value = GetDataOrSetDefault(closeToTray.Info.toString(), closeToTray.DefaultValue);
+	launchOnWindowsStartup.Value = GetDataOrSetDefault(launchOnWindowsStartup.Info.toString(), launchOnWindowsStartup.DefaultValue);
 }
 
 /*
 * Set the data in the persistant storage.
 */
-bool ApplicationData::SetData(std::wstring key, bool value)
+bool ApplicationData::SetData(std::string key, bool value)
 {
 	// Write data to the settingsfile.
-	std::wstring applicationDataFilePath = GetSettingsFile();
-	if (WritePrivateProfileString(L"config", key.c_str(), value ? L"1" : L"0", applicationDataFilePath.c_str()) == NULL)
-	{
+	std::string applicationDataFilePath = GetSettingsFile();
+	if (WritePrivateProfileString("config", key.c_str(), value ? "1" : "0", applicationDataFilePath.c_str()) == NULL) {
 		// We get here also when the folder does not exist.
-		std::wstringstream message;
-		message << MODULE_NAME L"Saving application-data failed because the data could not be written in the settings file '" << applicationDataFilePath.c_str() << "'.";
-		MessageBox(NULL, message.str().c_str(), L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		std::stringstream message;
+		message << MODULE_NAME "SetData() - Saving application-data failed because the data could not be written in the settings file '" << applicationDataFilePath.c_str() << "'.";
+		Logger::Error(message.str().c_str());
+		MessageBox(NULL, message.str().c_str(), "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 		return false;
 	}
 	return true;
 }
 
-bool ApplicationData::GetDataOrSetDefault(std::wstring key, bool defaultValue)
+bool ApplicationData::GetCloseToTray()
 {
-	std::wstring applicationDataFilePath = GetSettingsFile();
+	return closeToTray.Value;
+}
 
-	wchar_t valueBuffer[200] = { 0 };
-	if (GetPrivateProfileString(L"config", key.c_str(), defaultValue ? L"1" : L"0", valueBuffer, sizeof(valueBuffer), applicationDataFilePath.c_str()) == NULL)
-	{
-		std::wstringstream message;
-		message << MODULE_NAME L"Error while trying to read the settings file '" << applicationDataFilePath.c_str() << "'.";
-		MessageBox(NULL, message.str().c_str(), L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
+void ApplicationData::SetCloseToTray(bool value)
+{
+	closeToTray.Value = value;
+	// Write data to persistant storage.
+	SetData("CLOSE_TO_TRAY", value);
+}
+
+bool ApplicationData::GetLaunchOnWindowsStartup()
+{
+	return launchOnWindowsStartup.Value;
+}
+
+void ApplicationData::SetLaunchOnWindowsStartup(bool value)
+{
+	launchOnWindowsStartup.Value = value;
+	SetData("LAUNCH_ON_WINDOWS_STARTUP", value);
+}
+
+bool ApplicationData::GetDataOrSetDefault(std::string key, bool defaultValue)
+{
+	std::string applicationDataFilePath = GetSettingsFile();
+
+	TCHAR valueBuffer[200] = { 0 };
+	if (GetPrivateProfileString("config", key.c_str(), defaultValue ? "1" : "0", valueBuffer, sizeof(valueBuffer), applicationDataFilePath.c_str()) == NULL) {
+		std::stringstream message;
+		message << MODULE_NAME "GetDataOrSetDefault() - Error while trying to read the settings file '" << applicationDataFilePath.c_str() << "'.";
+		Logger::Error(message.str().c_str());
+		MessageBox(NULL, message.str().c_str(), "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 		return defaultValue;
 	}
 
 	// Convert the value from a c-string to bool. "1" -> true otherwise false.
-	bool value = wcsncmp(L"1", valueBuffer, 1) == 0;
+	bool value = _tcsncmp(TEXT("1"), valueBuffer, 1) == 0;
 	return value;
 }
 
-std::wstring ApplicationData::GetSettingsFile()
+std::string ApplicationData::GetSettingsFile()
 {
-	wchar_t applicationDataDirectoryPath[MAX_PATH] = { 0 };
-	if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, applicationDataDirectoryPath) != S_OK)
-	{
-		MessageBox(NULL, MODULE_NAME L"Saving application-data failed because the path could not be received.", L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
-		return std::wstring();
+	TCHAR applicationDataDirectoryPath[MAX_PATH] = { 0 };
+	if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, applicationDataDirectoryPath) != S_OK) {
+		Logger::Error(MODULE_NAME "GetSettingsFile() - Saving application-data failed because the path could not be received.");
+		MessageBox(NULL, MODULE_NAME "GetSettingsFile() - Saving application-data failed because the path could not be received.", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		return "";
 	}
 
 	// Create settings-filder if not exists.
-	wcscat_s(applicationDataDirectoryPath, sizeof(applicationDataDirectoryPath), L"\\WhatsappTray");
-	if (CreateDirectory(applicationDataDirectoryPath, NULL) == NULL)
-	{
-		// We can get here, if the folder already exists -> We dont want an error for that case ...
-		if (GetLastError() != ERROR_ALREADY_EXISTS)
-		{
-			MessageBox(NULL, MODULE_NAME L"Saving application-data failed because the folder could not be created.", L"WhatsappTray", MB_OK | MB_ICONINFORMATION);
-			return std::wstring();
+	_tcscat_s(applicationDataDirectoryPath, MAX_PATH, TEXT("\\WhatsappTray"));
+	if (CreateDirectory(applicationDataDirectoryPath, NULL) == NULL) {
+		// We can get here, if the folder already exists -> We don't want an error for that case ...
+		if (GetLastError() != ERROR_ALREADY_EXISTS) {
+			Logger::Error(MODULE_NAME "GetSettingsFile() - Saving application-data failed because the folder could not be created.");
+			MessageBox(NULL, MODULE_NAME "GetSettingsFile() - Saving application-data failed because the folder could not be created.", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+			return "";
 		}
 	}
-	std::wstring applicationDataFilePath(applicationDataDirectoryPath);
-	applicationDataFilePath.append(L"\\config.ini");
+	std::string applicationDataFilePath(applicationDataDirectoryPath);
+	applicationDataFilePath.append("\\config.ini");
 
 	return applicationDataFilePath;
 }

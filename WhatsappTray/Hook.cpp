@@ -35,53 +35,48 @@ static HHOOK _cbtProc = NULL;
 // Only works for 32-bit apps or 64-bit apps depending on whether this is complied as 32-bit or 64-bit (Whatsapp is a 64Bit-App)
 LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-	if (nCode >= 0)
-	{
+	if (nCode >= 0) {
 		CWPSTRUCT *msg = (CWPSTRUCT*)lParam;
 
-		wchar_t buffer[2000];
-		//swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"CallWndRetProc message:%X", msg->message);
+		char buffer[2000];
+		//sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc message=0x%llX", msg->message);
 		//OutputDebugString(buffer);
 
-		if (msg->message == WM_SYSCOMMAND)
-		{
+		if (msg->message == WM_SYSCOMMAND) {
 			// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
-			if (msg->wParam == SC_MINIMIZE)
-			{
-				OutputDebugString(MODULE_NAME L"SC_MINIMIZE");
+			if (msg->wParam == SC_MINIMIZE) {
+				OutputDebugStringA(MODULE_NAME "SC_MINIMIZE");
 
-				// Ich prüfe hier noch ob der Fenstertitel übereinstimmt. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
-				// Ich könnte hier auch noch die klasse checken, das hat dann den vorteil, das es noch genauer ist.
+				// Ich prÃ¼fe hier noch ob der Fenstertitel Ã¼bereinstimmt. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
+				// Ich kÃ¶nnte hier auch noch die klasse checken, das hat dann den vorteil, das es noch genauer ist.
 				// Sollte die Klasse von Whatsapp aus aber umbenannt werden muss ich hier wieder nachbesser.
 				// -> Daher lass ichs erstmal so...
-				if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME))
-				{
-					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)msg->hwnd);
+				if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
+					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, reinterpret_cast<LPARAM>(msg->hwnd));
 				}
 			}
-		}
-		else if (msg->message == WM_NCDESTROY)
-		{
-			swprintf_s(buffer, sizeof(buffer), MODULE_NAME L"WM_NCDESTROY hwnd:%X findwindow:%X", msg->hwnd, FindWindow(NAME, NAME));
-			OutputDebugString(buffer);
+		} else if (msg->message == WM_NCDESTROY) {
+			uintptr_t handle1 = reinterpret_cast<uintptr_t>(msg->hwnd);
+			uintptr_t handle2 = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
+			sprintf_s(buffer, sizeof(buffer), MODULE_NAME "WM_NCDESTROY hwnd=0x%llX findwindow=0x%llX", handle1, handle2);
+			OutputDebugStringA(buffer);
 
 			// Eigentlich sollte ich hier die gleichen probleme haben wie bei sc_minimize,
 			// Ich glaub aber das des zu einer zeit war wo noch ein globaler hook gemacht wurde...
-			// Deshalb denk ich es ist ok wenn ich hier den namen nicht prüfe.
+			// Deshalb denk ich es ist ok wenn ich hier den namen nicht prÃ¼fe.
 			// NOTE: Ich mach es deshalb nicht weil das Fenster zu den zeitpunkt nicht auffindbar ist, was warscheinlich daran liegt das es bereits geschlossen wurde.
 
-			// Ich machs jetz so dass ich wenn ich das Whatsapp-Fenster nicht finde auch schließe, wegen den oben genannten gruenden.
-			if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME) || FindWindow(NULL, WHATSAPP_CLIENT_NAME) == NULL)
-			{
-				bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, (LPARAM)msg->hwnd);
+			// Ich machs jetz so dass ich wenn ich das Whatsapp-Fenster nicht finde auch schlieÃŸe, wegen den oben genannten gruenden.
+			if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME) || FindWindow(NULL, WHATSAPP_CLIENT_NAME) == NULL) {
+				bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, reinterpret_cast<LPARAM>(msg->hwnd));
 				if (successfulSent) {
-					OutputDebugString(MODULE_NAME L"WM_WHAHTSAPP_CLOSING successful sent.");
+					OutputDebugStringA(MODULE_NAME "WM_WHAHTSAPP_CLOSING successful sent.");
 				}
 			}
 		}
 
 	}
-	
+
 	return CallNextHookEx(_hWndProc, nCode, wParam, lParam);
 }
 
@@ -91,11 +86,9 @@ LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam) {
 		CWPSTRUCT *msg = (CWPSTRUCT*)lParam;
 
 		//if (msg->hwnd == (HWND)0x00120A42)
-		if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME))
-		{
+		if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
 			//
-			if (msg->message == 0x2 || msg->message == 528 || msg->message == 70 || msg->message == 71 || msg->message == 28 || msg->message == 134 || msg->message == 6 || msg->message == 641 || msg->message == 642 || msg->message == 7 || msg->message == 533 || msg->message == 144 || msg->message == 70 || msg->message == 71 || msg->message == 134 || msg->message == 6 || msg->message == 28 || msg->message == 8 || msg->message == 641 || msg->message == 642 || msg->message == 626 || msg->message == 2)
-			{
+			if (msg->message == 0x2 || msg->message == 528 || msg->message == 70 || msg->message == 71 || msg->message == 28 || msg->message == 134 || msg->message == 6 || msg->message == 641 || msg->message == 642 || msg->message == 7 || msg->message == 533 || msg->message == 144 || msg->message == 70 || msg->message == 71 || msg->message == 134 || msg->message == 6 || msg->message == 28 || msg->message == 8 || msg->message == 641 || msg->message == 642 || msg->message == 626 || msg->message == 2) {
 				// WM_DESTROY
 
 				//std::ostringstream filename2;
@@ -126,13 +119,11 @@ LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam) {
 
 				myfile << "\nWM_SYSCOMMAND (" << msg->message << ")" << msg->wParam;
 
-				if (msg->wParam == 61472)
-				{
+				if (msg->wParam == 61472) {
 					myfile << "\nMinimize";
 					myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
 
-					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)msg->hwnd);
-					//PostMessage(FindWindow(NAME, NAME), WM_REFRTRAY, 0, (LPARAM)msg->hwnd);
+					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, reinterpret_cast<LPARAM>(msg->hwnd));
 				}
 				myfile.close();
 			}
@@ -151,17 +142,16 @@ LRESULT CALLBACK CBTProc(
 )
 {
 
-	if (nCode == HCBT_DESTROYWND)
-	{
+	if (nCode == HCBT_DESTROYWND) {
 		std::ostringstream filename2;
 		filename2 << "C:/hooktest/HWND_" << (HWND)wParam << ".txt";
 
 		std::ofstream myfile;
 		myfile.open(filename2.str().c_str(), std::ios::app);
 
-		myfile << "\nblocked (" ;
+		myfile << "\nblocked (";
 
-		
+
 		return 1;
 	}
 	return CallNextHookEx(_cbtProc, nCode, wParam, lParam);
@@ -173,10 +163,8 @@ LRESULT CALLBACK MouseProc(
 	_In_ LPARAM lParam
 )
 {
-	if (nCode >= 0)
-	{
-		if (wParam == WM_LBUTTONDOWN)
-		{
+	if (nCode >= 0) {
+		if (wParam == WM_LBUTTONDOWN) {
 			//std::ostringstream filename2;
 			//filename2 << "C:/hooktest/HWND_" << (HWND)wParam << ".txt";
 
@@ -194,9 +182,8 @@ LRESULT CALLBACK MouseProc(
 
 			bool mouseOnClosebutton = PtInRect(&rect, mhs->pt);
 
-			if (mouseOnClosebutton)
-			{
-				//OutputDebugString(MODULE_NAME L"Closebutton mousedown");
+			if (mouseOnClosebutton) {
+				//OutputDebugStringA(MODULE_NAME "Closebutton mousedown");
 				//myfile << "\nMinimize";
 				//myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
 
@@ -209,47 +196,41 @@ LRESULT CALLBACK MouseProc(
 	}
 
 	return CallNextHookEx(_cbtProc, nCode, wParam, lParam);
-} 
+}
 
-// Wenn ich als threadId 0 übergeben, ist es ein Globaler Hook.
+// Wenn ich als threadId 0 Ã¼bergeben, ist es ein Globaler Hook.
 BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
 {
-	if (!closeToTray)
-	{
-		_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
-		if (_hWndProc == NULL)
-		{
-			OutputDebugString(MODULE_NAME L"RegisterHook() - Error Creation Hook _hWndProc\n");
+	if (!closeToTray) {
+    _hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
+    if (_hWndProc == NULL) {
+      OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
+      UnRegisterHook();
+      return FALSE;
+    }
+	}
+
+	if (closeToTray) {
+		_mouseProc = SetWindowsHookEx(WH_MOUSE, (HOOKPROC)MouseProc, hLib, threadId);
+		if (_mouseProc == NULL) {
+			OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
 			UnRegisterHook();
 			return FALSE;
 		}
 	}
 
-	if (closeToTray)
-	{
-		_mouseProc = SetWindowsHookEx(WH_MOUSE, (HOOKPROC)MouseProc, hLib, threadId);
-		if (_mouseProc == NULL)
-		{
-			OutputDebugString(MODULE_NAME L"RegisterHook() - Error Creation Hook _hWndProc\n");
-			UnRegisterHook();
-			return FALSE;
-		}
-	}
-	
 	//_cbtProc = SetWindowsHookEx(WH_CBT, (HOOKPROC)CBTProc, hLib, threadId);
-	
+
 	return TRUE;
 }
 
 void DLLIMPORT UnRegisterHook()
 {
-	if (_hWndProc)
-	{
+	if (_hWndProc) {
 		UnhookWindowsHookEx(_hWndProc);
 		_hWndProc = NULL;
 	}
-	if (_mouseProc)
-	{
+	if (_mouseProc) {
 		UnhookWindowsHookEx(_mouseProc);
 		_mouseProc = NULL;
 	}
