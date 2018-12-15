@@ -47,8 +47,8 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 			if (msg->wParam == SC_MINIMIZE) {
 				OutputDebugStringA(MODULE_NAME "SC_MINIMIZE");
 
-				// Ich prüfe hier noch ob der Fenstertitel übereinstimmt. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
-				// Ich könnte hier auch noch die klasse checken, das hat dann den vorteil, das es noch genauer ist.
+				// Ich prÃ¼fe hier noch ob der Fenstertitel Ã¼bereinstimmt. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
+				// Ich kÃ¶nnte hier auch noch die klasse checken, das hat dann den vorteil, das es noch genauer ist.
 				// Sollte die Klasse von Whatsapp aus aber umbenannt werden muss ich hier wieder nachbesser.
 				// -> Daher lass ichs erstmal so...
 				if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
@@ -63,10 +63,10 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 
 			// Eigentlich sollte ich hier die gleichen probleme haben wie bei sc_minimize,
 			// Ich glaub aber das des zu einer zeit war wo noch ein globaler hook gemacht wurde...
-			// Deshalb denk ich es ist ok wenn ich hier den namen nicht prüfe.
+			// Deshalb denk ich es ist ok wenn ich hier den namen nicht prÃ¼fe.
 			// NOTE: Ich mach es deshalb nicht weil das Fenster zu den zeitpunkt nicht auffindbar ist, was warscheinlich daran liegt das es bereits geschlossen wurde.
 
-			// Ich machs jetz so dass ich wenn ich das Whatsapp-Fenster nicht finde auch schließe, wegen den oben genannten gruenden.
+			// Ich machs jetz so dass ich wenn ich das Whatsapp-Fenster nicht finde auch schlieÃŸe, wegen den oben genannten gruenden.
 			if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME) || FindWindow(NULL, WHATSAPP_CLIENT_NAME) == NULL) {
 				bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, reinterpret_cast<LPARAM>(msg->hwnd));
 				if (successfulSent) {
@@ -198,14 +198,16 @@ LRESULT CALLBACK MouseProc(
 	return CallNextHookEx(_cbtProc, nCode, wParam, lParam);
 }
 
-// Wenn ich als threadId 0 übergeben, ist es ein Globaler Hook.
+// Wenn ich als threadId 0 Ã¼bergeben, ist es ein Globaler Hook.
 BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
 {
-	_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
-	if (_hWndProc == NULL) {
-		OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
-		UnRegisterHook();
-		return FALSE;
+	if (!closeToTray) {
+    _hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
+    if (_hWndProc == NULL) {
+      OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
+      UnRegisterHook();
+      return FALSE;
+    }
 	}
 
 	if (closeToTray) {
