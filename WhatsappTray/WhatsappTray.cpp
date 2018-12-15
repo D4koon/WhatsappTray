@@ -43,6 +43,8 @@ static HWND _hwndWhatsappTray;
 static HWND _hwndForMenu;
 static HWND _hwndWhatsapp;
 
+static int messagesSinceMinimize = 0;
+
 static ApplicationData appData;
 static Registry registry;
 static std::unique_ptr<TrayManager> trayManager;
@@ -55,6 +57,12 @@ void setLaunchOnWindowsStartupSetting(bool value);
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
 	Logger::Setup();
+
+	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+	ULONG_PTR           gdiplusToken;
+
+	// Initialize GDI+.
+	Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
 	_hInstance = hInstance;
 
@@ -123,7 +131,48 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		DispatchMessage(&msg);
 	}
 
+	Gdiplus::GdiplusShutdown(gdiplusToken);
+
 	return 0;
+}
+
+HWND startWhatsapp()
+{
+	_hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME);
+
+	// The reason why i disabled this check is, when an folder is open with the name "WhatsApp" this fails because it finds the explorer-window with that name.
+	//if (hwndWhatsapp == NULL)
+	{
+		// Start WhatsApp.
+		wchar_t* startMenuProgramsBuffer;
+		if (SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuProgramsBuffer) != S_OK) {
+			MessageBox(NULL, "'Start Menu\\Programs' folder not found", "WhatsappTray", MB_OK);
+			return NULL;
+		}
+		std::string startMenuPrograms = Helper::ToString(startMenuProgramsBuffer);
+		CoTaskMemFree(startMenuProgramsBuffer);
+
+		TCHAR lnk[MAX_PATH];
+		StringCchCopy(lnk, MAX_PATH, startMenuPrograms.c_str());
+		StringCchCat(lnk, MAX_PATH, "\\WhatsApp\\WhatsApp.lnk");
+		HINSTANCE hInst = ShellExecute(0, NULL, lnk, NULL, NULL, 1);
+		if (hInst <= (HINSTANCE)32) {
+			MessageBox(NULL, "Error launching WhatsApp", "WhatsappTray", MB_OK);
+			return NULL;
+		}
+
+		// Wait for WhatsApp to be started.
+		Sleep(100);
+		for (int attemptN = 0; (_hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME)) == NULL; ++attemptN) {
+			if (attemptN > 120) {
+				MessageBox(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
+				return NULL;
+			}
+			Sleep(500);
+		}
+	}
+
+	return _hwndWhatsapp;
 }
 
 /*
@@ -212,6 +261,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_ADDTRAY:
 		Logger::Info(MODULE_NAME "WM_ADDTRAY");
+		messagesSinceMinimize = 0;
 		trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 		break;
 	case WM_TRAYCMD:
@@ -247,52 +297,16 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		Logger::Info(MODULE_NAME "QuitMessage posted.");
 		break;
 	case WM_INDEXED_DB_CHANGED:
-		//PlaySound((LPCTSTR)SND_ALIAS_SYSTEMEXIT, NULL, SND_ALIAS_ID);
+		
 		Logger::Info(MODULE_NAME "WM_INDEXED_DB_CHANGED");
-		trayManager->SetIcon(_hwndWhatsapp);
+		messagesSinceMinimize++;
+		char messagesSinceMinimizeBuffer[20] = { 0 };
+		snprintf(messagesSinceMinimizeBuffer, sizeof(messagesSinceMinimizeBuffer), "%d", messagesSinceMinimize);
+		trayManager->SetIcon(_hwndWhatsapp, messagesSinceMinimizeBuffer);
 		break;
 	}
 
 	return DefWindowProc(hwnd, msg, wParam, lParam);
-}
-
-HWND startWhatsapp()
-{
-	_hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME);
-
-	// The reason why i disabled this check is, when an folder is open with the name "WhatsApp" this fails because it finds the explorer-window with that name.
-	//if (hwndWhatsapp == NULL)
-	{
-		// Start WhatsApp.
-		wchar_t* startMenuProgramsBuffer;
-		if (SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuProgramsBuffer) != S_OK) {
-			MessageBox(NULL, "'Start Menu\\Programs' folder not found", "WhatsappTray", MB_OK);
-			return NULL;
-		}
-		std::string startMenuPrograms = Helper::ToString(startMenuProgramsBuffer);
-		CoTaskMemFree(startMenuProgramsBuffer);
-
-		TCHAR lnk[MAX_PATH];
-		StringCchCopy(lnk, MAX_PATH, startMenuPrograms.c_str());
-		StringCchCat(lnk, MAX_PATH, "\\WhatsApp\\WhatsApp.lnk");
-		HINSTANCE hInst = ShellExecute(0, NULL, lnk, NULL, NULL, 1);
-		if (hInst <= (HINSTANCE)32) {
-			MessageBox(NULL, "Error launching WhatsApp", "WhatsappTray", MB_OK);
-			return NULL;
-		}
-
-		// Wait for WhatsApp to be started.
-		Sleep(100);
-		for (int attemptN = 0; (_hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME)) == NULL; ++attemptN) {
-			if (attemptN > 120) {
-				MessageBox(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
-				return NULL;
-			}
-			Sleep(500);
-		}
-	}
-
-	return _hwndWhatsapp;
 }
 
 bool setHook()

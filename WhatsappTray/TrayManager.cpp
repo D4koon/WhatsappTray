@@ -26,6 +26,8 @@
 #include "Logger.h"
 #include "WhatsappTray.h"
 
+using namespace Gdiplus;
+
 #undef MODULE_NAME
 #define MODULE_NAME "TrayManager::"
 
@@ -178,12 +180,16 @@ void TrayManager::RefreshWindowInTray(HWND hwnd)
 	}
 }
 
-void TrayManager::SetIcon(HWND hwnd)
+void TrayManager::SetIcon(HWND hwnd, LPCSTR text)
 {
 	int32_t index = GetIndexFromWindowHandle(hwnd);
 	if (index == -1) {
 		return;
 	}
+
+	HICON waIcon = Helper::GetWindowIcon(hwnd);
+
+	HICON iconWithText = AddTextToIcon(waIcon, text);
 
 	NOTIFYICONDATA nid;
 	ZeroMemory(&nid, sizeof(nid));
@@ -192,19 +198,12 @@ void TrayManager::SetIcon(HWND hwnd)
 	nid.uID = static_cast<UINT>(index);
 	nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
 	nid.uCallbackMessage = WM_TRAYCMD;
-	nid.hIcon = (HICON)LoadImage( // returns a HANDLE so we have to cast to HICON
-		NULL,             // hInstance must be NULL when loading from a file
-		"app2.ico",   // the icon file name
-		IMAGE_ICON,       // specifies that the file is an icon
-		0,                // width of the image (we'll specify default later on)
-		0,                // height of the image
-		LR_LOADFROMFILE |  // we want to load a file (as opposed to a resource)
-		LR_DEFAULTSIZE |   // default metrics based on the type (IMAGE_ICON, 32x32)
-		LR_SHARED         // let the system release the handle when it's no longer used
-	);
+	nid.hIcon = iconWithText;
 	GetWindowText(hwnd, nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
 	nid.uVersion = NOTIFYICON_VERSION;
 	Shell_NotifyIcon(NIM_MODIFY, &nid);
+
+	::DestroyIcon(iconWithText);
 }
 
 HWND TrayManager::GetHwndFromIndex(uintptr_t index)
@@ -223,4 +222,70 @@ int32_t TrayManager::GetIndexFromWindowHandle(HWND hwnd)
 		}
 	}
 	return -1;
+}
+
+/**
+ * Move into Helper-class?
+ * NOTE:
+ * I first tried this by only using gdi but since gdi has very limited support for transparency it would be very compliacted to do that.
+ * When doing a TextOutA the alpha value gets overridden and the text is then transparent.
+ * The solution is probably descibed here https://theartofdev.com/2013/10/24/transparent-text-rendering-with-gdi/ but is complicated.
+ * I dont want to spent more time on it so im simply switch to gdi+ which can handle transparency
+ * https://stackoverflow.com/questions/43393857/ <- has the problem described above.
+ * Warning:
+ * GDI+ has to be initialize to work. See WhatsappTray.cpp
+ * There might be some GDI-memory leaks did not check to much.
+*/
+HICON TrayManager::AddTextToIcon(HICON hBackgroundIcon, LPCSTR text)
+{
+	// Load up background icon
+	ICONINFO ii = { 0 };
+	//GetIconInfo creates bitmaps for the hbmMask and hbmColor members of ICONINFO.
+	//WARNING(TODO): The calling application must manage these bitmaps and delete them when they are no longer necessary.!!!!
+	::GetIconInfo(hBackgroundIcon, &ii);
+
+	//BITMAP bm;
+	//GetObject(ii.hbmColor, sizeof(BITMAP), &bm);
+
+	HDC hDc = ::GetDC(NULL);
+	HDC hMemDC = ::CreateCompatibleDC(hDc);
+
+	HGDIOBJ hOldBmp = ::SelectObject(hMemDC, ii.hbmColor);
+	//for (size_t i = 0; i < 32; i++) {
+	//	for (size_t y = 0; y < 32; y++) {
+	//		COLORREF pixelColor = GetPixel(hMemDC, i, y);
+	//		Logger::Info(MODULE_NAME "Pixelcolor: %X", pixelColor);
+	//	}
+	//}
+
+	Graphics graphics(hMemDC);
+	SolidBrush brush(Color(255, 255, 0, 0));
+	FontFamily fontFamily(L"Arial Black");
+	Font font(&fontFamily, 24, FontStyleBold, UnitPixel);
+	PointF pointF(3.0f, -1.5f);
+	if (strlen(text) >= 2) {
+		pointF = PointF(-6.0f, -1.5f);
+	}
+
+	graphics.DrawString(Helper::ToWString(text).c_str(), -1, &font, pointF, &brush);
+
+	::SelectObject(hMemDC, hOldBmp);
+
+	// Use new icon bitmap with text and new mask bitmap with text
+	ICONINFO ii2 = { 0 };
+	ii2.fIcon = TRUE;
+	ii2.hbmMask = ii.hbmMask;
+	ii2.hbmColor = ii.hbmColor;
+
+	// Create updated icon
+	HICON iconWithText = ::CreateIconIndirect(&ii2);
+
+	// Delete background icon bitmap info
+	::DeleteObject(ii.hbmColor);
+	::DeleteObject(ii.hbmMask);
+
+	::DeleteDC(hMemDC);
+	::ReleaseDC(NULL, hDc);
+
+	return iconWithText;
 }

@@ -1,3 +1,8 @@
+
+#include <objidl.h>
+#include <gdiplus.h>
+#pragma comment (lib,"Gdiplus.lib")
+
 #define NAME TEXT("WhatsappTray")
 #define WHATSAPP_CLIENT_NAME TEXT("WhatsApp")
 
