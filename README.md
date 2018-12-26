@@ -14,7 +14,9 @@ By starting WhatsappTray WhatsApp will be started and from this point on the min
 
 *Remember that you need to run, from this point on, the app from the WhatsappTray shortcut.*
 
-In case that you want that on close the app minimizes to the notification tray, you can set it to do so from the icon in the notification tray.
+If you want to minimize WhatsApp to tray with the close(X)-button, you have 2 options:
+- Start WhatsappTray and minimize it. Then rightclick the trayicon and select the "Close to tray"-option.
+- Start WhatsappTray with "--closeToTray"
 
 ## Thanks to:
 Nikolay Redko and J.D. Purcell for creating the RBTray-Software (http://rbtray.sourceforge.net/)
