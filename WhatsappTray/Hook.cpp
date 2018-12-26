@@ -32,7 +32,14 @@ static HHOOK _hWndProc = NULL;
 static HHOOK _mouseProc = NULL;
 static HHOOK _cbtProc = NULL;
 
-// Only works for 32-bit apps or 64-bit apps depending on whether this is complied as 32-bit or 64-bit (Whatsapp is a 64Bit-App)
+/**
+ * Only works for 32-bit apps or 64-bit apps depending on whether this is complied as 32-bit or 64-bit (Whatsapp is a 64Bit-App)
+ *
+ * @param nCode
+ * @param wParam
+ * @param lParam
+ * @return
+ */
 LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
 	if (nCode >= 0) {
@@ -47,8 +54,8 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 			if (msg->wParam == SC_MINIMIZE) {
 				OutputDebugStringA(MODULE_NAME "SC_MINIMIZE");
 
-				// Ich prüfe hier noch ob der Fenstertitel übereinstimmt. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
-				// Ich könnte hier auch noch die klasse checken, das hat dann den vorteil, das es noch genauer ist.
+				// Here i check if the windowtitle matches. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
+				// I could also check the window-class, which would be even more precise.
 				// Sollte die Klasse von Whatsapp aus aber umbenannt werden muss ich hier wieder nachbesser.
 				// -> Daher lass ichs erstmal so...
 				if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
@@ -80,7 +87,8 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 	return CallNextHookEx(_hWndProc, nCode, wParam, lParam);
 }
 
-LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam)
+{
 	//if (nCode >= 0)
 	{
 		CWPSTRUCT *msg = (CWPSTRUCT*)lParam;
@@ -101,8 +109,6 @@ LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam) {
 
 				//myfile << "\nblocked (" << msg->message << ")" << msg->wParam;
 
-
-
 				//MSG msgr;
 				//PeekMessage(&msgr, msg->hwnd, 0, 0, PM_REMOVE);
 
@@ -111,11 +117,11 @@ LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam) {
 
 			//if (msg->message == WM_SYSCOMMAND)
 			{
-				std::ostringstream filename2;
-				filename2 << "C:/hooktest/HWND_" << msg->hwnd << ".txt";
+				std::ostringstream filename;
+				filename << "C:/hooktest/HWND_" << msg->hwnd << ".txt";
 
 				std::ofstream myfile;
-				myfile.open(filename2.str().c_str(), std::ios::app);
+				myfile.open(filename.str().c_str(), std::ios::app);
 
 				myfile << "\nWM_SYSCOMMAND (" << msg->message << ")" << msg->wParam;
 
@@ -135,19 +141,14 @@ LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam) {
 	return CallNextHookEx(_hWndProc, nCode, wParam, lParam);
 }
 
-LRESULT CALLBACK CBTProc(
-	_In_ int    nCode,
-	_In_ WPARAM wParam,
-	_In_ LPARAM lParam
-)
+LRESULT CALLBACK CBTProc(_In_ int nCode, _In_ WPARAM wParam, _In_ LPARAM lParam)
 {
-
 	if (nCode == HCBT_DESTROYWND) {
-		std::ostringstream filename2;
-		filename2 << "C:/hooktest/HWND_" << (HWND)wParam << ".txt";
+		std::ostringstream filename;
+		filename << "C:/hooktest/HWND_" << (HWND)wParam << ".txt";
 
 		std::ofstream myfile;
-		myfile.open(filename2.str().c_str(), std::ios::app);
+		myfile.open(filename.str().c_str(), std::ios::app);
 
 		myfile << "\nblocked (";
 
@@ -157,11 +158,7 @@ LRESULT CALLBACK CBTProc(
 	return CallNextHookEx(_cbtProc, nCode, wParam, lParam);
 }
 
-LRESULT CALLBACK MouseProc(
-	_In_ int    nCode,
-	_In_ WPARAM wParam,
-	_In_ LPARAM lParam
-)
+LRESULT CALLBACK MouseProc(_In_ int nCode, _In_ WPARAM wParam, _In_ LPARAM lParam)
 {
 	if (nCode >= 0) {
 		if (wParam == WM_LBUTTONDOWN) {
@@ -198,16 +195,23 @@ LRESULT CALLBACK MouseProc(
 	return CallNextHookEx(_cbtProc, nCode, wParam, lParam);
 }
 
-// Wenn ich als threadId 0 übergeben, ist es ein Globaler Hook.
+/**
+ * Registers the hook.
+ *
+ * @param hLib
+ * @param threadId If threadId 0 is passed, it is a global Hook.
+ * @param closeToTray
+ * @return
+ */
 BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
 {
 	if (!closeToTray) {
-    _hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
-    if (_hWndProc == NULL) {
-      OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
-      UnRegisterHook();
-      return FALSE;
-    }
+		_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
+		if (_hWndProc == NULL) {
+			OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
+			UnRegisterHook();
+			return FALSE;
+		}
 	}
 
 	if (closeToTray) {
