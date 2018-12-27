@@ -164,7 +164,7 @@ HWND startWhatsapp()
 		// Wait for WhatsApp to be started.
 		Sleep(100);
 		for (int attemptN = 0; (_hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME)) == NULL; ++attemptN) {
-			if (attemptN > 120) {
+			if (attemptN > 60) {
 				MessageBox(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
 				return NULL;
 			}

@@ -53,6 +53,11 @@ void TrayManager::MinimizeWindowToTray(HWND hwnd)
 	AddWindowToTray(hwnd);
 
 	// Hide window
+	// NOTE: The SW_MINIMIZE is important for the case when close-to-tray-feature is used:
+	// Without it, a maximized window is not restored as maximized.
+	// This means Windows only remebers the size when it was minimized before. This is done implicied when the minimize-button is used for minimizing to tray
+	// See also https://github.com/D4koon/WhatsappTray/issues/10
+	ShowWindow(hwnd, SW_MINIMIZE);
 	ShowWindow(hwnd, SW_HIDE);
 }
 

@@ -197,7 +197,9 @@ void Logger::ProcessLog(const Loglevel loglevel, const char* logTextBuffer)
 	logText.append(logTextBuffer);
 
 	// Log everything to VS-console/DebugView for debugging.
+#ifdef _DEBUG
 	OutputDebugStringA(logText.c_str());
+#endif
 
 	// If the loglevel is above the maximum, nothing shall be loged.
 	if (loglevel > Logger::loglevelToLog) {
