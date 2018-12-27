@@ -80,9 +80,13 @@ void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
 	}
 }
 
+/**
+ * Stops the thread and waits till it is finished.
+ */
 void DirectoryWatcher::StopThread()
 {
 	terminate = true;
-	SetEvent(WaitHandle);
+	// Increase count by one so the thread continues and can end.
+	ReleaseSemaphore(WaitHandle, 1, NULL);
 	watcherThread.join();
 }

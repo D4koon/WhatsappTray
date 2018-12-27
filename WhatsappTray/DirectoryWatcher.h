@@ -34,7 +34,7 @@ private:
 	std::string watchedDirectory;
 	const std::function<void(const DWORD, std::string)> directoryChangedEvent;
 	std::thread watcherThread;
-	bool terminate;
+	volatile bool terminate;
 	HANDLE WaitHandle;
 
 	void WatchDirectoryWorker(std::string directory);
