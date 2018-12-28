@@ -117,14 +117,14 @@ void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::string strFilename
 			continue;
 		}
 
-		Logger::Debug(MODULE_NAME "IndexedDbChanged() - found recv: '%s'", lineBuffer.c_str());
+		Logger::Debug(MODULE_NAME "IndexedDbChanged() - Found recv: '%s'", lineBuffer.c_str());
 
 		// Match: recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\ttimestampN
 		if (std::regex_search(lineBuffer.c_str(), std::regex("recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\\ttimestampN")) == false) {
 			continue;
 		}
 
-		Logger::Debug(MODULE_NAME "IndexedDbChanged() - found match");
+		Logger::Debug(MODULE_NAME "IndexedDbChanged() - Found match");
 
 		newMessageEvent();
 	}

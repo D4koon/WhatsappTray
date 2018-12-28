@@ -117,7 +117,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AboutDialog.cpp" />
-    <ClCompile Include="ApplicationData.cpp" />
+    <ClCompile Include="AppData.cpp" />
     <ClCompile Include="DirectoryWatcher.cpp" />
     <ClCompile Include="Helper.cpp" />
     <ClCompile Include="Logger.cpp" />
@@ -134,7 +134,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AboutDialog.h" />
-    <ClInclude Include="ApplicationData.h" />
+    <ClInclude Include="AppData.h" />
     <ClInclude Include="DirectoryWatcher.h" />
     <ClInclude Include="Enum.h" />
     <ClInclude Include="Helper.h" />

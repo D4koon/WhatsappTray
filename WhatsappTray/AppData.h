@@ -45,11 +45,11 @@ public:
 	const Data Info;
 };
 
-class ApplicationData
+class AppData
 {
 public:
-	ApplicationData();
-	~ApplicationData() {}
+	AppData();
+	~AppData() {}
 	bool SetData(std::string key, bool value);
 	bool GetCloseToTray();
 	void SetCloseToTray(bool value);
@@ -57,7 +57,7 @@ public:
 	void SetLaunchOnWindowsStartup(bool value);
 	bool GetDataOrSetDefault(std::string key, bool defaultValue);
 private:
-	std::string GetSettingsFile();
+	std::string GetAppDataFilePath();
 	
 	/// If true, the close-button of WhatsApp sends it to tray instead of closing.
 	DataSetBool closeToTray;

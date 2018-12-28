@@ -32,9 +32,6 @@
     <ClInclude Include="Registry.h">
       <Filter>Files</Filter>
     </ClInclude>
-    <ClInclude Include="ApplicationData.h">
-      <Filter>Files</Filter>
-    </ClInclude>
     <ClInclude Include="resource.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
@@ -71,11 +68,11 @@
     <ClInclude Include="AboutDialog.h">
       <Filter>Files</Filter>
     </ClInclude>
+    <ClInclude Include="AppData.h">
+      <Filter>Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ApplicationData.cpp">
-      <Filter>Files</Filter>
-    </ClCompile>
     <ClCompile Include="Registry.cpp">
       <Filter>Files</Filter>
     </ClCompile>
@@ -107,6 +104,9 @@
       <Filter>Files\Helper</Filter>
     </ClCompile>
     <ClCompile Include="AboutDialog.cpp">
+      <Filter>Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AppData.cpp">
       <Filter>Files</Filter>
     </ClCompile>
   </ItemGroup>

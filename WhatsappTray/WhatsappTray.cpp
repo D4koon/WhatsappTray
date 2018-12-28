@@ -23,7 +23,7 @@
 #include "WhatsappTray.h"
 #include "resource.h"
 
-#include "ApplicationData.h"
+#include "AppData.h"
 #include "Registry.h"
 #include "WhatsAppApi.h"
 #include "TrayManager.h"
@@ -45,7 +45,7 @@ static HWND _hwndWhatsapp;
 
 static int messagesSinceMinimize = 0;
 
-static ApplicationData appData;
+static AppData appData;
 static Registry registry;
 static std::unique_ptr<TrayManager> trayManager;
 
@@ -59,7 +59,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	Logger::Setup();
 
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-	ULONG_PTR           gdiplusToken;
+	ULONG_PTR gdiplusToken;
 
 	// Initialize GDI+.
 	Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
@@ -122,8 +122,8 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	}
 	trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
 
-	// Send a WM_INDEXED_DB_CHANGED-message when a new WhatsApp-message has arrived.
-	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_INDEXED_DB_CHANGED, 0, 0); });
+	// Send a WM_WHATSAPP_API_NEW_MESSAGE-message when a new WhatsApp-message has arrived.
+	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_WHATSAPP_API_NEW_MESSAGE, 0, 0); });
 
 	MSG msg;
 	while (IsWindow(_hwndWhatsappTray) && GetMessage(&msg, _hwndWhatsappTray, 0, 0)) {
@@ -296,9 +296,9 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		PostQuitMessage(0);
 		Logger::Info(MODULE_NAME "QuitMessage posted.");
 		break;
-	case WM_INDEXED_DB_CHANGED:
+	case WM_WHATSAPP_API_NEW_MESSAGE:
 		
-		Logger::Info(MODULE_NAME "WM_INDEXED_DB_CHANGED");
+		Logger::Info(MODULE_NAME "WM_WHATSAPP_API_NEW_MESSAGE");
 		messagesSinceMinimize++;
 		char messagesSinceMinimizeBuffer[20] = { 0 };
 		snprintf(messagesSinceMinimizeBuffer, sizeof(messagesSinceMinimizeBuffer), "%d", messagesSinceMinimize);
