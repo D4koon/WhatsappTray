@@ -21,6 +21,8 @@
 
 #include <windows.h>
 #include "WhatsappTray.h"
+#include "WindowsMessage.h"
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -34,7 +36,7 @@ static HHOOK _cbtProc = NULL;
 
 /**
  * Only works for 32-bit apps or 64-bit apps depending on whether this is complied as 32-bit or 64-bit (Whatsapp is a 64Bit-App)
- *
+ * NOTE: This only caputers messages sent by SendMessage() and NOT PostMessage()!
  * @param nCode
  * @param wParam
  * @param lParam
@@ -46,7 +48,7 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 		CWPSTRUCT *msg = (CWPSTRUCT*)lParam;
 
 		char buffer[2000];
-		//sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc message=0x%llX", msg->message);
+		//sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc message=%s(0x%lX) wParam=0x%llX", WindowsMessage::GetString(msg->message).c_str(), msg->message, msg->wParam);
 		//OutputDebugString(buffer);
 
 		if (msg->message == WM_SYSCOMMAND) {

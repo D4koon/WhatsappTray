@@ -148,6 +148,7 @@
     <ClInclude Include="WhatsAppApi.h" />
     <ClInclude Include="WhatsappTray.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="WindowsMessage.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="WhatsappTray.ico" />

@@ -71,6 +71,9 @@
     <ClInclude Include="AppData.h">
       <Filter>Files</Filter>
     </ClInclude>
+    <ClInclude Include="WindowsMessage.h">
+      <Filter>Files\Helper</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Registry.cpp">
