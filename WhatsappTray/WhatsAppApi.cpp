@@ -41,6 +41,9 @@ void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& newMessageHand
 	newMessageEvent = newMessageHandler;
 }
 
+/**
+ * NOTE: I noticed false positives when Whatsapp is started an not yet fully initialized.
+ */
 void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::string strFilename)
 {
 	// The logfiles change so we have to keep track of them.
