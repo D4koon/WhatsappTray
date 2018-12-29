@@ -44,8 +44,8 @@ static HHOOK _cbtProc = NULL;
  */
 LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-	if (nCode >= 0) {
-		CWPSTRUCT *msg = (CWPSTRUCT*)lParam;
+	if (nCode >= HC_ACTION) {
+		CWPSTRUCT* msg = reinterpret_cast<CWPSTRUCT*>(lParam);
 
 		char buffer[2000];
 		//sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc message=%s(0x%lX) wParam=0x%llX", WindowsMessage::GetString(msg->message).c_str(), msg->message, msg->wParam);
@@ -86,7 +86,7 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 
 	}
 
-	return CallNextHookEx(_hWndProc, nCode, wParam, lParam);
+	return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
 LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam)
@@ -140,7 +140,7 @@ LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam)
 
 	}
 
-	return CallNextHookEx(_hWndProc, nCode, wParam, lParam);
+	return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
 LRESULT CALLBACK CBTProc(_In_ int nCode, _In_ WPARAM wParam, _In_ LPARAM lParam)
@@ -224,8 +224,6 @@ BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
 			return FALSE;
 		}
 	}
-
-	//_cbtProc = SetWindowsHookEx(WH_CBT, (HOOKPROC)CBTProc, hLib, threadId);
 
 	return TRUE;
 }
