@@ -29,6 +29,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+; The dirs-part is needed to set permisions for the folder so that the config file and the logs can be written.
+[Dirs]
+Name: "{app}"; Permissions: users-full
+ 
 [Files]
 Source: "bin\Release\WhatsappTray.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "bin\Release\Hook.dll"; DestDir: "{app}"; Flags: ignoreversion
