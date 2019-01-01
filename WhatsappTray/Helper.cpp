@@ -174,5 +174,5 @@ std::string Helper::GetFilenameFromPath(std::string path)
 	char extension[MAX_PATH];
 	_splitpath_s(path.c_str(), NULL, NULL, NULL, NULL, filename, sizeof(filename), extension, sizeof(extension));
 
-	return std::string(filename) + extension;
+	return std::string(filename);
 }

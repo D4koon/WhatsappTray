@@ -206,16 +206,19 @@ HWND findWhatsapp()
 		}
 		CloseHandle(processHandle);
 
-		Logger::Info(MODULE_NAME "::startWhatsapp() -Module filepath is:%s", filepath);
+		Logger::Info(MODULE_NAME "::startWhatsapp() - Filepath is: '%s'", filepath);
 
 		std::string filenameFromWindow = Helper::GetFilenameFromPath(filepath);
 		std::string filenameFromSettings = Helper::GetFilenameFromPath(appData.WhatsappStartpath.Get());
 
+		// NOTE: I do not compare the extension because when i start from an link, the name is WhatsApp.lnk whicht does not match the WhatsApp.exe
+		// This could be improved by reading the real value from the .lnk but i think this should be fine for now.
 		if (filenameFromWindow.compare(filenameFromSettings) != 0) {
 			Logger::Error(MODULE_NAME "::startWhatsapp() - Filenames from window and from settings do not match.");
 			continue;
 		}
 
+		Logger::Info(MODULE_NAME "::startWhatsapp() - Found match.");
 		break;
 	}
 
