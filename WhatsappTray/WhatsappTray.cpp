@@ -33,6 +33,7 @@
 
 #include <Strsafe.h>
 #include <psapi.h>
+#include <filesystem>
 
 #undef MODULE_NAME
 #define MODULE_NAME "[WhatsappTray] "
@@ -143,11 +144,20 @@ HWND startWhatsapp()
 {
 	_hwndWhatsapp = findWhatsapp();
 
-	std::string waStartPath = appData.WhatsappStartpath.Get();
-	Logger::Info(MODULE_NAME "::startWhatsapp() - Starting from path='" + waStartPath + "'");
-	HINSTANCE hInst = ShellExecuteA(0, NULL, waStartPath.c_str(), NULL, NULL, SW_NORMAL);
+	std::experimental::filesystem::path waStartPath = std::string(appData.WhatsappStartpath.Get());
+	std::string waStartPathString;
+	if (waStartPath.is_relative()) {
+		std::experimental::filesystem::path appPath = Helper::GetApplicationFilePath();
+		auto combinedPath = appPath / waStartPath;
+		waStartPathString = combinedPath.string();
+	} else {
+		waStartPathString = waStartPath.string();
+	}
+
+	Logger::Info(MODULE_NAME "::startWhatsapp() - Starting from path='" + waStartPathString + "'");
+	HINSTANCE hInst = ShellExecuteA(0, NULL, waStartPathString.c_str(), NULL, NULL, SW_NORMAL);
 	if (hInst <= (HINSTANCE)32) {
-		MessageBoxA(NULL, (std::string("Error launching WhatsApp from path='") + waStartPath + "'").c_str(), "WhatsappTray", MB_OK);
+		MessageBoxA(NULL, (std::string("Error launching WhatsApp from path='") + waStartPathString + "'").c_str(), "WhatsappTray", MB_OK);
 		return NULL;
 	}
 
