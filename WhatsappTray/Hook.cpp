@@ -60,14 +60,15 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 				// I could also check the window-class, which would be even more precise.
 				// Sollte die Klasse von Whatsapp aus aber umbenannt werden muss ich hier wieder nachbesser.
 				// -> Daher lass ichs erstmal so...
-				if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
+				// UPDATE 01.01.2019: Removed it because this check can fail if another window has this name and this code should only be injected into whatsapp now anyway.
+				//if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
 					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, reinterpret_cast<LPARAM>(msg->hwnd));
-				}
+				//}
 			}
 		} else if (msg->message == WM_NCDESTROY) {
 			uintptr_t handle1 = reinterpret_cast<uintptr_t>(msg->hwnd);
-			uintptr_t handle2 = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
-			sprintf_s(buffer, sizeof(buffer), MODULE_NAME "WM_NCDESTROY hwnd=0x%llX findwindow=0x%llX", handle1, handle2);
+			uintptr_t whatsappTrayWindowHandle = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
+			sprintf_s(buffer, sizeof(buffer), MODULE_NAME "WM_NCDESTROY hwnd=0x%llX whatsappTrayWindowHandle=0x%llX", handle1, whatsappTrayWindowHandle);
 			OutputDebugStringA(buffer);
 
 			// Eigentlich sollte ich hier die gleichen probleme haben wie bei sc_minimize,
@@ -76,12 +77,13 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 			// NOTE: Ich mach es deshalb nicht weil das Fenster zu den zeitpunkt nicht auffindbar ist, was warscheinlich daran liegt das es bereits geschlossen wurde.
 
 			// Ich machs jetz so dass ich wenn ich das Whatsapp-Fenster nicht finde auch schließe, wegen den oben genannten gruenden.
-			if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME) || FindWindow(NULL, WHATSAPP_CLIENT_NAME) == NULL) {
+			// UPDATE 01.01.2019: Removed it because this check can fail if another window has this name and this code should only be injected into whatsapp now anyway.
+			//if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME) || FindWindow(NULL, WHATSAPP_CLIENT_NAME) == NULL) {
 				bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, reinterpret_cast<LPARAM>(msg->hwnd));
 				if (successfulSent) {
 					OutputDebugStringA(MODULE_NAME "WM_WHAHTSAPP_CLOSING successful sent.");
 				}
-			}
+			//}
 		}
 
 	}

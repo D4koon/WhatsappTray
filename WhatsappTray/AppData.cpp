@@ -26,7 +26,6 @@
 
 #include <Shlobj.h>
 #include <sstream>
-#include <tchar.h>
 #include <string>
 
 #undef MODULE_NAME
@@ -36,21 +35,25 @@
  * The data-storage for the application.
  */
 AppData::AppData()
-	: closeToTray(false, Data::CLOSE_TO_TRAY)
-	, launchOnWindowsStartup(false, Data::LAUNCH_ON_WINDOWS_STARTUP)
+	: CloseToTray(Data::CLOSE_TO_TRAY, false, &AppData::SetData)
+	, LaunchOnWindowsStartup(Data::LAUNCH_ON_WINDOWS_STARTUP, false, &AppData::SetData)
+	, StartMinimized(Data::START_MINIMIZED, false, &AppData::SetData)
+	, WhatsappStartpath(Data::WHATSAPP_STARTPATH, Helper::GetStartMenuProgramsDirectory() + "\\WhatsApp\\WhatsApp.lnk", &AppData::SetData)
 {
-	closeToTray.Value = GetDataOrSetDefault(closeToTray.Info.toString(), closeToTray.DefaultValue);
-	launchOnWindowsStartup.Value = GetDataOrSetDefault(launchOnWindowsStartup.Info.toString(), launchOnWindowsStartup.DefaultValue);
+	CloseToTray.Get().FromString(GetDataOrSetDefault(CloseToTray));
+	LaunchOnWindowsStartup.Get().FromString(GetDataOrSetDefault(LaunchOnWindowsStartup));
+	StartMinimized.Get().FromString(GetDataOrSetDefault(StartMinimized));
+	WhatsappStartpath.Get().FromString(GetDataOrSetDefault(WhatsappStartpath));
 }
 
 /*
 * Set the data in the persistant storage.
+* Write data to the AppData-file.
 */
-bool AppData::SetData(std::string key, bool value)
+bool AppData::SetData(DataEntry& value)
 {
-	// Write data to the AppData-file.
 	std::string appDataFilePath = GetAppDataFilePath();
-	if (WritePrivateProfileString("config", key.c_str(), value ? "1" : "0", appDataFilePath.c_str()) == NULL) {
+	if (WritePrivateProfileStringA("config", value.Info.toString(), value.Value->ToString().c_str(), appDataFilePath.c_str()) == NULL) {
 		// We get here also when the folder does not exist.
 		std::stringstream message;
 		message << MODULE_NAME "SetData() - Saving app-data failed because the data could not be written in the AppData-file '" << appDataFilePath.c_str() << "'.";
@@ -61,45 +64,27 @@ bool AppData::SetData(std::string key, bool value)
 	return true;
 }
 
-bool AppData::GetCloseToTray()
-{
-	return closeToTray.Value;
-}
-
-void AppData::SetCloseToTray(bool value)
-{
-	closeToTray.Value = value;
-	// Write data to persistant storage.
-	SetData("CLOSE_TO_TRAY", value);
-}
-
-bool AppData::GetLaunchOnWindowsStartup()
-{
-	return launchOnWindowsStartup.Value;
-}
-
-void AppData::SetLaunchOnWindowsStartup(bool value)
-{
-	launchOnWindowsStartup.Value = value;
-	SetData("LAUNCH_ON_WINDOWS_STARTUP", value);
-}
-
-bool AppData::GetDataOrSetDefault(std::string key, bool defaultValue)
+/**
+ * Returns the default value if no value is found.
+ */
+std::string AppData::GetDataOrSetDefault(DataEntry& value)
 {
 	std::string appDataFilePath = GetAppDataFilePath();
 
-	TCHAR valueBuffer[200] = { 0 };
-	if (GetPrivateProfileString("config", key.c_str(), defaultValue ? "1" : "0", valueBuffer, sizeof(valueBuffer), appDataFilePath.c_str()) == NULL) {
+	char valueBuffer[200] = { 0 };
+	DWORD copiedCharacters = GetPrivateProfileStringA("config", value.Info.toString(), value.DefaultValue->ToString().c_str(), valueBuffer, sizeof(valueBuffer), appDataFilePath.c_str());
+	// If the default value is "" i dont want to trigger an error if the value cannot be read. So i added "value.DefaultValue->ToString().length() > 0"
+	if (copiedCharacters == 0 && value.DefaultValue->ToString().length() > 0) {
+		// If we end up here that means the config was found but was empty.
+		// If the config would have not existed the default value would have been used.
 		std::stringstream message;
-		message << MODULE_NAME "GetDataOrSetDefault() - Error while trying to read the AppData-file '" << appDataFilePath.c_str() << "'.";
+		message << MODULE_NAME "GetDataOrSetDefault() - Could not find value '" << value.Info.toString() << "' in AppData-file '" << appDataFilePath.c_str() << "'.\n Setting the value to default='" << value.DefaultValue->ToString().c_str() << "'.";
 		Logger::Error(message.str().c_str());
 		MessageBox(NULL, message.str().c_str(), "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-		return defaultValue;
+		return value.DefaultValue->ToString();
 	}
 
-	// Convert the value from a c-string to bool. "1" -> true otherwise false.
-	bool value = _tcsncmp(TEXT("1"), valueBuffer, 1) == 0;
-	return value;
+	return valueBuffer;
 }
 
 /**

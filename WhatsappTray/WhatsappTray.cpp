@@ -31,8 +31,8 @@
 #include "Helper.h"
 #include "Logger.h"
 
-#include <Shlobj.h>
 #include <Strsafe.h>
+#include <psapi.h>
 
 #undef MODULE_NAME
 #define MODULE_NAME "[WhatsappTray] "
@@ -49,8 +49,10 @@ static AppData appData;
 static Registry registry;
 static std::unique_ptr<TrayManager> trayManager;
 
-LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+HWND findWhatsapp();
 HWND startWhatsapp();
+bool createWindow();
 bool setHook();
 void setLaunchOnWindowsStartupSetting(bool value);
 
@@ -67,11 +69,11 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	_hInstance = hInstance;
 
 	// Setup the settings for launch on windows startup.
-	setLaunchOnWindowsStartupSetting(appData.GetLaunchOnWindowsStartup());
+	setLaunchOnWindowsStartupSetting(appData.LaunchOnWindowsStartup.Get());
 
 	// Check if closeToTray was set per commandline. (this overrides the persistent storage-value.)
 	if (strstr(lpCmdLine, "--closeToTray")) {
-		appData.SetCloseToTray(true);
+		appData.CloseToTray.Set(true);
 	}
 	if (!(_hLib = LoadLibrary("Hook.dll"))) {
 		MessageBox(NULL, "Error loading Hook.dll.", "WhatsappTray", MB_OK | MB_ICONERROR);
@@ -80,6 +82,18 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	if (startWhatsapp() == NULL) {
 		return 0;
+	}
+
+	if (appData.StartMinimized.Get()) {
+		Logger::Info(MODULE_NAME "WinMain() - Prepare for starting minimized.");
+
+		WhatsAppApi::NotifyOnFullInit([]() {
+			Logger::Info(MODULE_NAME "WinMain() - NotifyOnFullInit");
+			Sleep(500);
+			PostMessageA(_hwndWhatsappTray, WM_ADDTRAY, 0, 0);
+			// Remove event after the first execution
+			WhatsAppApi::NotifyOnFullInit(NULL);
+		});
 	}
 
 	// Test if WhatsappTray is already running.
@@ -98,24 +112,10 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		return 0;
 	}
 
-	WNDCLASS wc;
-	wc.style = 0;
-	wc.lpfnWndProc = HookWndProc;
-	wc.cbClsExtra = 0;
-	wc.cbWndExtra = 0;
-	wc.hInstance = hInstance;
-	wc.hIcon = NULL;
-	wc.hCursor = NULL;
-	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wc.lpszMenuName = NULL;
-	wc.lpszClassName = NAME;
-
-	if (!RegisterClass(&wc)) {
-		MessageBox(NULL, "Error creating window class", "WhatsappTray", MB_OK | MB_ICONERROR);
+	if (createWindow() == false) {
 		return 0;
 	}
 
-	_hwndWhatsappTray = CreateWindow(NAME, NAME, WS_OVERLAPPED, 0, 0, 0, 0, (HWND)NULL, (HMENU)NULL, (HINSTANCE)hInstance, (LPVOID)NULL);
 	if (!_hwndWhatsappTray) {
 		MessageBox(NULL, "Error creating window", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return 0;
@@ -136,43 +136,107 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	return 0;
 }
 
+/**
+ * Start WhatsApp.
+ */
 HWND startWhatsapp()
 {
-	_hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME);
+	_hwndWhatsapp = findWhatsapp();
 
-	// The reason why i disabled this check is, when an folder is open with the name "WhatsApp" this fails because it finds the explorer-window with that name.
-	//if (hwndWhatsapp == NULL)
-	{
-		// Start WhatsApp.
-		wchar_t* startMenuProgramsBuffer;
-		if (SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuProgramsBuffer) != S_OK) {
-			MessageBox(NULL, "'Start Menu\\Programs' folder not found", "WhatsappTray", MB_OK);
+	std::string waStartPath = appData.WhatsappStartpath.Get();
+	Logger::Info(MODULE_NAME "::startWhatsapp() - Starting from path='" + waStartPath + "'");
+	HINSTANCE hInst = ShellExecuteA(0, NULL, waStartPath.c_str(), NULL, NULL, SW_NORMAL);
+	if (hInst <= (HINSTANCE)32) {
+		MessageBoxA(NULL, (std::string("Error launching WhatsApp from path='") + waStartPath + "'").c_str(), "WhatsappTray", MB_OK);
+		return NULL;
+	}
+
+	// Wait for WhatsApp to be started.
+	Sleep(100);
+	for (int attemptN = 0; (_hwndWhatsapp = findWhatsapp()) == NULL; ++attemptN) {
+		if (attemptN > 60) {
+			MessageBoxA(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
 			return NULL;
 		}
-		std::string startMenuPrograms = Helper::ToString(startMenuProgramsBuffer);
-		CoTaskMemFree(startMenuProgramsBuffer);
-
-		TCHAR lnk[MAX_PATH];
-		StringCchCopy(lnk, MAX_PATH, startMenuPrograms.c_str());
-		StringCchCat(lnk, MAX_PATH, "\\WhatsApp\\WhatsApp.lnk");
-		HINSTANCE hInst = ShellExecute(0, NULL, lnk, NULL, NULL, 1);
-		if (hInst <= (HINSTANCE)32) {
-			MessageBox(NULL, "Error launching WhatsApp", "WhatsappTray", MB_OK);
-			return NULL;
-		}
-
-		// Wait for WhatsApp to be started.
-		Sleep(100);
-		for (int attemptN = 0; (_hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME)) == NULL; ++attemptN) {
-			if (attemptN > 60) {
-				MessageBox(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
-				return NULL;
-			}
-			Sleep(500);
-		}
+		Sleep(500);
 	}
 
 	return _hwndWhatsapp;
+}
+
+/**
+ * Search for the WhatsApp window.
+ * Checks if it is the correct window:
+ * 1. Get the path to the binary(exe) for the window with "WhatsApp" in the title
+ * 2. Match it with the appData-setting.
+ */
+HWND findWhatsapp()
+{
+	HWND currentWindow = NULL;
+	while (true) {
+		currentWindow = FindWindowExA(NULL, currentWindow, NULL, WHATSAPP_CLIENT_NAME);
+		if (currentWindow == NULL) {
+			return NULL;
+		}
+
+		DWORD processId;
+		DWORD threadId = GetWindowThreadProcessId(currentWindow, &processId);
+
+		HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+		if (processHandle == NULL) {
+			Logger::Error(MODULE_NAME "::startWhatsapp() - Failed to open process.");
+			continue;
+		}
+
+		char filepath[MAX_PATH];
+		if (GetModuleFileNameExA(processHandle, NULL, filepath, MAX_PATH) == 0) {
+			CloseHandle(processHandle);
+			Logger::Error(MODULE_NAME "::startWhatsapp() - Failed to get module filepath.");
+			continue;
+		}
+		CloseHandle(processHandle);
+
+		Logger::Info(MODULE_NAME "::startWhatsapp() -Module filepath is:%s", filepath);
+
+		std::string filenameFromWindow = Helper::GetFilenameFromPath(filepath);
+		std::string filenameFromSettings = Helper::GetFilenameFromPath(appData.WhatsappStartpath.Get());
+
+		if (filenameFromWindow.compare(filenameFromSettings) != 0) {
+			Logger::Error(MODULE_NAME "::startWhatsapp() - Filenames from window and from settings do not match.");
+			continue;
+		}
+
+		break;
+	}
+
+	return currentWindow;
+}
+
+/**
+ * Create a window.
+ * This window will be mainly used to receive messages.
+ */
+bool createWindow()
+{
+	WNDCLASS wc;
+	wc.style = 0;
+	wc.lpfnWndProc = WhatsAppTrayWndProc;
+	wc.cbClsExtra = 0;
+	wc.cbWndExtra = 0;
+	wc.hInstance = _hInstance;
+	wc.hIcon = NULL;
+	wc.hCursor = NULL;
+	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wc.lpszMenuName = NULL;
+	wc.lpszClassName = NAME;
+
+	if (!RegisterClass(&wc)) {
+		MessageBox(NULL, "Error creating window class", "WhatsappTray", MB_OK | MB_ICONERROR);
+		return false;
+	}
+
+	_hwndWhatsappTray = CreateWindow(NAME, NAME, WS_OVERLAPPED, 0, 0, 0, 0, (HWND)NULL, (HMENU)NULL, _hInstance, (LPVOID)NULL);
+	return true;
 }
 
 /*
@@ -191,17 +255,24 @@ void ExecuteMenu()
 	// - Display options.
 
 	// -- Close to Tray
-	if (appData.GetCloseToTray()) {
+	if (appData.CloseToTray.Get()) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_CLOSE_TO_TRAY, "Close to tray");
 	} else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_CLOSE_TO_TRAY, "Close to tray");
 	}
 
 	// -- Launch on Windows startup.
-	if (appData.GetLaunchOnWindowsStartup()) {
+	if (appData.LaunchOnWindowsStartup.Get()) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
 	} else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
+	}
+
+	// -- Start minimized.
+	if (appData.StartMinimized.Get()) {
+		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_START_MINIMIZED, "Start minimized");
+	} else {
+		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_START_MINIMIZED, "Start minimized");
 	}
 
 	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
@@ -219,9 +290,9 @@ void ExecuteMenu()
 	DestroyMenu(hMenu);
 }
 
-LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	Logger::Info(MODULE_NAME "HookWndProc() - Message Received msg='0x%X'", msg);
+	Logger::Info(MODULE_NAME "WhatsAppTrayWndProc() - Message Received msg='0x%X'", msg);
 
 	switch (msg) {
 	case WM_COMMAND:
@@ -233,14 +304,18 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		{
 			// Toggle the 'close to tray'-feature.
 			// We have to first change the value and then unregister and register to set the ne value in the hook.
-			appData.SetCloseToTray(!appData.GetCloseToTray());
+			appData.CloseToTray.Set(!appData.CloseToTray.Get());
 
 			SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
 			break;
 		}
 		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP:
 			// Toggle the 'launch on windows startup'-feature.
-			setLaunchOnWindowsStartupSetting(!appData.GetLaunchOnWindowsStartup());
+			setLaunchOnWindowsStartupSetting(!appData.LaunchOnWindowsStartup.Get());
+			break;
+		case IDM_SETTING_START_MINIMIZED:
+			// Toggle the 'start minimized'-feature.
+			appData.StartMinimized.Set(!appData.StartMinimized.Get());
 			break;
 		case IDM_RESTORE:
 			Logger::Info(MODULE_NAME "IDM_RESTORE");
@@ -256,7 +331,7 @@ LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_REAPPLY_HOOK:
 		UnRegisterHook();
-		_hwndWhatsapp = FindWindow(NULL, WHATSAPP_CLIENT_NAME);
+		_hwndWhatsapp = findWhatsapp();
 		setHook();
 		break;
 	case WM_ADDTRAY:
@@ -319,7 +394,7 @@ bool setHook()
 		return false;
 	}
 
-	if (RegisterHook(_hLib, threadId, appData.GetCloseToTray()) == false) {
+	if (RegisterHook(_hLib, threadId, appData.CloseToTray.Get()) == false) {
 		MessageBox(NULL, "Error setting hook procedure.", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return false;
 	}
@@ -331,7 +406,7 @@ bool setHook()
  */
 void setLaunchOnWindowsStartupSetting(bool value)
 {
-	appData.SetLaunchOnWindowsStartup(value);
+	appData.LaunchOnWindowsStartup.Set(value);
 
 	if (value) {
 		registry.RegisterProgram();

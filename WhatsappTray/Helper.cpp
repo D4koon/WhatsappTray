@@ -26,6 +26,7 @@
 
 #include <vector>
 #include <sstream>
+#include <Shlobj.h>
 
 /*
 * @brief Get the Path to the exe-file of the application.
@@ -141,7 +142,7 @@ std::string Helper::GetProductAndVersion()
 	LPVOID pvProductVersion = NULL;
 	unsigned int iProductVersionLen = 0;
 
-	UINT                uiVerLen = 0;
+	UINT uiVerLen = 0;
 	VS_FIXEDFILEINFO*   pFixedInfo = 0;     // pointer to fixed file info structure
 	// get the fixed file info (language-independent) 
 	if (VerQueryValue(&data[0], TEXT("\\"), (void**)&pFixedInfo, (UINT *)&uiVerLen) == 0) {
@@ -153,4 +154,25 @@ std::string Helper::GetProductAndVersion()
 	stringStream << HIWORD(pFixedInfo->dwProductVersionMS) << "." << LOWORD(pFixedInfo->dwProductVersionMS) << "." << HIWORD(pFixedInfo->dwProductVersionLS) << "." << LOWORD(pFixedInfo->dwProductVersionLS);
 
 	return stringStream.str();
+}
+
+std::string Helper::GetStartMenuProgramsDirectory()
+{
+	wchar_t* startMenuProgramsBuffer;
+	if (SHGetKnownFolderPath(FOLDERID_Programs, 0, NULL, &startMenuProgramsBuffer) != S_OK) {
+		MessageBoxA(NULL, "'Start Menu\\Programs' folder not found", "WhatsappTray", MB_OK);
+		return NULL;
+	}
+	std::string startMenuPrograms = Helper::ToString(startMenuProgramsBuffer);
+	CoTaskMemFree(startMenuProgramsBuffer);
+	return startMenuPrograms;
+}
+
+std::string Helper::GetFilenameFromPath(std::string path)
+{
+	char filename[MAX_PATH];
+	char extension[MAX_PATH];
+	_splitpath_s(path.c_str(), NULL, NULL, NULL, NULL, filename, sizeof(filename), extension, sizeof(extension));
+
+	return std::string(filename) + extension;
 }

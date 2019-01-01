@@ -31,9 +31,11 @@ public:
 	WhatsAppApi() { }
 	~WhatsAppApi() { }
 	static void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& newMessageHandler);
+	static void WhatsAppApi::NotifyOnFullInit(const std::function<void()>& newMessageHandler);
 private:
 	static std::unique_ptr<DirectoryWatcher> dirWatcher;
 	static void IndexedDbChanged(const DWORD dwAction, std::string strFilename);
-	static std::function<void()> newMessageEvent;
+	static std::function<void()> receivedMessageEvent;
+	static std::function<void()> receivedFullInitEvent;
 };
 

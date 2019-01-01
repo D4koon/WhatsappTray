@@ -38,5 +38,7 @@ public:
 	static std::string Helper::ToString(const std::wstring& s);
 	static HICON GetWindowIcon(HWND hwnd);
 	static std::string GetProductAndVersion();
+	static std::string GetStartMenuProgramsDirectory();
+	static std::string GetFilenameFromPath(std::string path);
 };
 

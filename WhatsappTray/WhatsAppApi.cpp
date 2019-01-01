@@ -34,11 +34,17 @@
 
 
 std::unique_ptr<DirectoryWatcher> WhatsAppApi::dirWatcher(new DirectoryWatcher("C:\\Users\\Dakoon\\AppData\\Roaming\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb", &WhatsAppApi::IndexedDbChanged));
-std::function<void()> WhatsAppApi::newMessageEvent = NULL;
+std::function<void()> WhatsAppApi::receivedMessageEvent = NULL;
+std::function<void()> WhatsAppApi::receivedFullInitEvent = NULL;
 
-void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& newMessageHandler)
+void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& receivedMessageHandler)
 {
-	newMessageEvent = newMessageHandler;
+	receivedMessageEvent = receivedMessageHandler;
+}
+
+void WhatsAppApi::NotifyOnFullInit(const std::function<void()>& receivedStatusV3Handler)
+{
+	receivedFullInitEvent = receivedStatusV3Handler;
 }
 
 /**
@@ -116,6 +122,14 @@ void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::string strFilename
 		}
 		processedLineCount = lineCounter;
 
+		if (std::regex_search(lineBuffer.c_str(), std::regex("models:mute:cache"))) {
+			Logger::Debug(MODULE_NAME "IndexedDbChanged() - Found match for fullInit.");
+
+			if (receivedFullInitEvent) {
+				receivedFullInitEvent();
+			}
+		}
+
 		if (lineBuffer.find("recv:") == std::string::npos) {
 			continue;
 		}
@@ -123,12 +137,14 @@ void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::string strFilename
 		Logger::Debug(MODULE_NAME "IndexedDbChanged() - Found recv: '%s'", lineBuffer.c_str());
 
 		// Match: recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\ttimestampN
-		if (std::regex_search(lineBuffer.c_str(), std::regex("recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\\ttimestampN")) == false) {
-			continue;
+		if (std::regex_search(lineBuffer.c_str(), std::regex("recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\\ttimestampN"))) {
+			Logger::Debug(MODULE_NAME "IndexedDbChanged() - Found match for receivedMessage.");
+
+			if (receivedMessageEvent) {
+				receivedMessageEvent();
+			}
 		}
 
-		Logger::Debug(MODULE_NAME "IndexedDbChanged() - Found match");
-
-		newMessageEvent();
+		
 	}
 }
