@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "WhatsappTray"
-#define MyAppVersion "1.3.1"
+#define MyAppVersion "1.4.0"
 #define MyAppURL "https://github.com/D4koon/WhatsappTray"
 #define MyAppExeName "WhatsappTray.exe"
 
@@ -19,7 +19,7 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={pf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
-OutputBaseFilename=WhatsappTrayV1.3.1
+OutputBaseFilename=WhatsappTrayV1.4.0
 Compression=lzma
 SolidCompression=yes
 
@@ -30,8 +30,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "WhatsappTray\x64\Release\WhatsappTray.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "WhatsappTray\x64\Release\Hook.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "bin\Release\WhatsappTray.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "bin\Release\Hook.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
