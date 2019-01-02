@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "WhatsappTray"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "1.4.1"
 #define MyAppURL "https://github.com/D4koon/WhatsappTray"
 #define MyAppExeName "WhatsappTray.exe"
 
@@ -19,7 +19,7 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={pf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
-OutputBaseFilename=WhatsappTrayV1.4.0
+OutputBaseFilename=WhatsappTrayV{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 
