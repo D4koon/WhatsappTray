@@ -24,7 +24,7 @@
 #include "Logger.h"
 #include "Helper.h"
 
-#include <Shlobj.h>
+//#include <Shlobj.h>
 #include <sstream>
 #include <string>
 

@@ -36,7 +36,7 @@
 #include <filesystem>
 
 #undef MODULE_NAME
-#define MODULE_NAME "[WhatsappTray] "
+#define MODULE_NAME "WhatsappTray"
 
 static HINSTANCE _hInstance;
 static HMODULE _hLib;
@@ -60,6 +60,10 @@ void setLaunchOnWindowsStartupSetting(bool value);
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
 	Logger::Setup();
+
+	Logger::Info(MODULE_NAME "::WinMain() - Starting WhatsappTray %s.", Helper::GetProductAndVersion().c_str());
+
+	WhatsAppApi::Init();
 
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
@@ -86,10 +90,10 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	}
 
 	if (appData.StartMinimized.Get()) {
-		Logger::Info(MODULE_NAME "WinMain() - Prepare for starting minimized.");
+		Logger::Info(MODULE_NAME "::WinMain() - Prepare for starting minimized.");
 
 		WhatsAppApi::NotifyOnFullInit([]() {
-			Logger::Info(MODULE_NAME "WinMain() - NotifyOnFullInit");
+			Logger::Info(MODULE_NAME "::WinMain() - NotifyOnFullInit");
 			Sleep(500);
 			PostMessageA(_hwndWhatsappTray, WM_ADDTRAY, 0, 0);
 			// Remove event after the first execution
@@ -259,7 +263,7 @@ void ExecuteMenu()
 {
 	HMENU hMenu = CreatePopupMenu();
 	if (!hMenu) {
-		Logger::Error(MODULE_NAME "ExecuteMenu() - Error creating menu.");
+		Logger::Error(MODULE_NAME "::ExecuteMenu() - Error creating menu.");
 		MessageBox(NULL, "Error creating menu.", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return;
 	}
@@ -305,7 +309,7 @@ void ExecuteMenu()
 
 LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	Logger::Info(MODULE_NAME "WhatsAppTrayWndProc() - Message Received msg='0x%X'", msg);
+	Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - Message Received msg='0x%X'", msg);
 
 	switch (msg) {
 	case WM_COMMAND:
@@ -331,7 +335,7 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 			appData.StartMinimized.Set(!appData.StartMinimized.Get());
 			break;
 		case IDM_RESTORE:
-			Logger::Info(MODULE_NAME "IDM_RESTORE");
+			Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - IDM_RESTORE");
 			trayManager->RestoreWindowFromTray(_hwndForMenu);
 			break;
 		case IDM_CLOSE:
@@ -348,7 +352,7 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 		setHook();
 		break;
 	case WM_ADDTRAY:
-		Logger::Info(MODULE_NAME "WM_ADDTRAY");
+		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_ADDTRAY");
 		messagesSinceMinimize = 0;
 		trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 		break;
@@ -371,22 +375,22 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 
 	case WM_WHAHTSAPP_CLOSING:
 		// If Whatsapp is closing we want to close WhatsappTray as well.
-		Logger::Info(MODULE_NAME "WM_WHAHTSAPP_CLOSING");
+		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_WHAHTSAPP_CLOSING");
 		DestroyWindow(_hwndWhatsappTray);
 		break;
 	case WM_DESTROY:
-		Logger::Info(MODULE_NAME "WM_DESTROY");
+		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_DESTROY");
 
 		trayManager->RestoreAllWindowsFromTray();
 
 		UnRegisterHook();
 		FreeLibrary(_hLib);
 		PostQuitMessage(0);
-		Logger::Info(MODULE_NAME "QuitMessage posted.");
+		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - QuitMessage posted.");
 		break;
 	case WM_WHATSAPP_API_NEW_MESSAGE:
 		
-		Logger::Info(MODULE_NAME "WM_WHATSAPP_API_NEW_MESSAGE");
+		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_WHATSAPP_API_NEW_MESSAGE");
 		messagesSinceMinimize++;
 		char messagesSinceMinimizeBuffer[20] = { 0 };
 		snprintf(messagesSinceMinimizeBuffer, sizeof(messagesSinceMinimizeBuffer), "%d", messagesSinceMinimize);

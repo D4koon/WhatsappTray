@@ -101,7 +101,7 @@ IDI_WHATSAPPTRAY        ICON                    "WhatsappTray.ico"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 1,0,0,0
- PRODUCTVERSION 1,4,0,0
+ PRODUCTVERSION 1,4,1,0
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -119,10 +119,10 @@ BEGIN
             VALUE "FileDescription", "WhatsappTray"
             VALUE "FileVersion", "1.0.0.0"
             VALUE "InternalName", "WhatsappTray"
-            VALUE "LegalCopyright", "Copyright © 1998-2018 Sebastian Amann, Nikolay Redko, J.D. Purcell"
+            VALUE "LegalCopyright", "Copyright © 1998-2019 Sebastian Amann, Nikolay Redko, J.D. Purcell"
             VALUE "OriginalFilename", "WhatsappTray.exe"
             VALUE "ProductName", "WhatsappTray"
-            VALUE "ProductVersion", "1.4.0.0"
+            VALUE "ProductVersion", "1.4.1.0"
         END
     END
     BLOCK "VarFileInfo"

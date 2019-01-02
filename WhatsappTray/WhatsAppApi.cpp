@@ -28,14 +28,38 @@
 
 #include <regex>
 #include <Mmsystem.h>
+#include <Shlobj.h>
+#include <filesystem>
+
+namespace fs = std::experimental::filesystem;
 
 #undef MODULE_NAME
 #define MODULE_NAME "WhatsAppApi::"
 
 
-std::unique_ptr<DirectoryWatcher> WhatsAppApi::dirWatcher(new DirectoryWatcher("C:\\Users\\Dakoon\\AppData\\Roaming\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb", &WhatsAppApi::IndexedDbChanged));
+std::unique_ptr<DirectoryWatcher> WhatsAppApi::dirWatcher = std::unique_ptr<DirectoryWatcher>(nullptr);
+
 std::function<void()> WhatsAppApi::receivedMessageEvent = NULL;
 std::function<void()> WhatsAppApi::receivedFullInitEvent = NULL;
+
+void WhatsAppApi::Init()
+{
+	char appDataDirectory[MAX_PATH] = { 0 };
+	if (SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, appDataDirectory) != S_OK) {
+		Logger::Fatal(MODULE_NAME "Init() - Could not get the AppData-directory!");
+		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the AppData-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		return;
+	}
+	std::string leveldbDirectory = std::string(appDataDirectory) + "\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb";
+	Logger::Info(MODULE_NAME "Init() - Using leveldb-directory:%s", leveldbDirectory.c_str());
+
+	if (fs::exists(fs::path(leveldbDirectory)) == false) {
+		Logger::Fatal(MODULE_NAME "Init() - Could not get the leveldb-directory!");
+		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the leveldb-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		return;
+	}
+	WhatsAppApi::dirWatcher = std::unique_ptr<DirectoryWatcher>(new DirectoryWatcher(leveldbDirectory, &WhatsAppApi::IndexedDbChanged));
+}
 
 void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& receivedMessageHandler)
 {

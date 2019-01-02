@@ -48,7 +48,7 @@ class SBool : public Serializeable
 public:
 	SBool() : Value(false) { }
 	SBool(bool value) : Value(value) { }
-	void operator=(const bool newValue)
+	void operator=(const SBool& newValue)
 	{
 		Value = newValue;
 		valueChanged();
@@ -70,7 +70,7 @@ class SString : public Serializeable
 public:
 	SString() : Value("") { }
 	SString(std::string value) : Value(value) { }
-	void operator=(const std::string newValue)
+	void operator=(const SString& newValue)
 	{
 		Value = newValue;
 		valueChanged();
@@ -126,7 +126,9 @@ public:
 	std::function<bool(DataEntry&)> valueChangedHandler;
 	void OnValueChanged()
 	{
-		valueChangedHandler(*this);
+		if (valueChangedHandler) {
+			valueChangedHandler(*this);
+		}
 	}
 };
 

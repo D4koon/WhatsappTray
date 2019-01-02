@@ -30,6 +30,7 @@ class WhatsAppApi
 public:
 	WhatsAppApi() { }
 	~WhatsAppApi() { }
+	static void WhatsAppApi::Init();
 	static void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& newMessageHandler);
 	static void WhatsAppApi::NotifyOnFullInit(const std::function<void()>& newMessageHandler);
 private:
