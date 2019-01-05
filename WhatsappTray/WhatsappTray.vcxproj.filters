@@ -74,9 +74,6 @@
     <ClInclude Include="WindowsMessage.h">
       <Filter>Files\Helper</Filter>
     </ClInclude>
-    <ClInclude Include="Version.h">
-      <Filter>Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Registry.cpp">
@@ -123,6 +120,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="WhatsappTray.ico">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Version.rc2">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

@@ -30,11 +30,16 @@
 #include "AboutDialog.h"
 #include "Helper.h"
 #include "Logger.h"
-#include "Version.h"
 
 #include <Strsafe.h>
 #include <psapi.h>
 #include <filesystem>
+
+#ifdef _DEBUG
+constexpr auto CompileConfiguration = "Debug";
+#else
+constexpr auto CompileConfiguration = "Release";
+#endif
 
 #undef MODULE_NAME
 #define MODULE_NAME "WhatsappTray"

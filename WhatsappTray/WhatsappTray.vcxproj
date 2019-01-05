@@ -81,6 +81,9 @@
     <BuildLog>
       <Path>$(IntDir)Buildlog\$(MSBuildProjectName).log</Path>
     </BuildLog>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)WhatsappTray;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Midl>
@@ -114,6 +117,9 @@
     <BuildLog>
       <Path>$(IntDir)Buildlog\$(MSBuildProjectName).log</Path>
     </BuildLog>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)WhatsappTray;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AboutDialog.cpp" />
@@ -145,13 +151,13 @@
     <ClInclude Include="Registry.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="TrayManager.h" />
-    <ClInclude Include="Version.h" />
     <ClInclude Include="WhatsAppApi.h" />
     <ClInclude Include="WhatsappTray.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="WindowsMessage.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Version.rc2" />
     <None Include="WhatsappTray.ico" />
   </ItemGroup>
   <ItemGroup>
