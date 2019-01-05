@@ -136,7 +136,7 @@ void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::string strFilename
 		}
 
 		if (file.eof()) {
-			Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.eof()");
+			//Logger::Debug(MODULE_NAME "IndexedDbChanged() - file.eof()");
 			return;
 		}
 

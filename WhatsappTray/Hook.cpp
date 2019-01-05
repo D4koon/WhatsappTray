@@ -34,58 +34,88 @@ static HHOOK _hWndProc = NULL;
 static HHOOK _mouseProc = NULL;
 static HHOOK _cbtProc = NULL;
 
+// Using this variable i am able to enable/disable tracing. I could do that by using a self defined windowmessage and send it to the application. (not implemented yet)
+#ifdef _DEBUG
+static bool traceActivated = true;
+#else
+static bool traceActivated = false;
+#endif
+
+void TraceString(std::string traceString)
+{
+	if (traceActivated) {
+		OutputDebugStringA(traceString.c_str());
+	}
+}
+
+/**
+ * To verify that we found the correct window:
+ * 1. Check if its a toplevel-window (below desktop)
+ * 2. Match the window-name with whatsapp.
+ */
+bool IsTopLevelWhatsApp(HWND hwnd)
+{
+	char windowNameBuffer[2000];
+	GetWindowTextA(hwnd, windowNameBuffer, sizeof(windowNameBuffer));
+
+	if (hwnd != GetAncestor(hwnd, GA_ROOT)) {
+		TraceString(MODULE_NAME " - Window is not a toplevel-window.");
+		return false;
+	}
+	if (strstr(windowNameBuffer, WHATSAPP_CLIENT_NAME) == false) {
+		TraceString(std::string(MODULE_NAME " - Window-name '") + windowNameBuffer + "' does not match '" WHATSAPP_CLIENT_NAME "'." + windowNameBuffer);
+		return false;
+	}
+	return true;
+}
+
 /**
  * Only works for 32-bit apps or 64-bit apps depending on whether this is complied as 32-bit or 64-bit (Whatsapp is a 64Bit-App)
  * NOTE: This only caputers messages sent by SendMessage() and NOT PostMessage()!
+ * NOTE: This function also receives messages from child-windows.
+ * - This means we have to be carefull not accidently mix them.
+ * - For example when watching for WM_NCDESTROY, it is possible that a childwindow does that but the mainwindow remains open.
  * @param nCode
  * @param wParam
- * @param lParam
- * @return
+ * @param lParam Contains a CWPSTRUCT*-struct in which the data can be found.
  */
 LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-	if (nCode >= HC_ACTION) {
-		CWPSTRUCT* msg = reinterpret_cast<CWPSTRUCT*>(lParam);
+	if (nCode < HC_ACTION) {
+		return CallNextHookEx(NULL, nCode, wParam, lParam);
+	}
 
-		char buffer[2000];
-		//sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc message=%s(0x%lX) wParam=0x%llX", WindowsMessage::GetString(msg->message).c_str(), msg->message, msg->wParam);
-		//OutputDebugString(buffer);
+	CWPSTRUCT* msg = reinterpret_cast<CWPSTRUCT*>(lParam);
 
-		if (msg->message == WM_SYSCOMMAND) {
-			// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
-			if (msg->wParam == SC_MINIMIZE) {
-				OutputDebugStringA(MODULE_NAME "SC_MINIMIZE");
+	char windowNameBuffer[2000];
+	GetWindowTextA(msg->hwnd, windowNameBuffer, sizeof(windowNameBuffer));
 
-				// Here i check if the windowtitle matches. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
-				// I could also check the window-class, which would be even more precise.
-				// Sollte die Klasse von Whatsapp aus aber umbenannt werden muss ich hier wieder nachbesser.
-				// -> Daher lass ichs erstmal so...
-				// UPDATE 01.01.2019: Removed it because this check can fail if another window has this name and this code should only be injected into whatsapp now anyway.
-				//if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
-					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, reinterpret_cast<LPARAM>(msg->hwnd));
-				//}
+	char buffer[2000];
+	sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc windowNameBuffer='%s' msg->hwnd='0x%lX' message=%s(0x%lX) wParam=0x%llX", windowNameBuffer, GetAncestor(msg->hwnd, GA_ROOT), WindowsMessage::GetString(msg->message).c_str(), msg->message, msg->wParam);
+	TraceString(buffer);
+
+	if (msg->message == WM_SYSCOMMAND) {
+		// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
+		if (msg->wParam == SC_MINIMIZE) {
+			TraceString(MODULE_NAME "SC_MINIMIZE");
+
+			// Here i check if the windowtitle matches. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
+			if (IsTopLevelWhatsApp(msg->hwnd)) {
+				PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, reinterpret_cast<LPARAM>(msg->hwnd));
 			}
-		} else if (msg->message == WM_NCDESTROY) {
-			uintptr_t handle1 = reinterpret_cast<uintptr_t>(msg->hwnd);
-			uintptr_t whatsappTrayWindowHandle = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
-			sprintf_s(buffer, sizeof(buffer), MODULE_NAME "WM_NCDESTROY hwnd=0x%llX whatsappTrayWindowHandle=0x%llX", handle1, whatsappTrayWindowHandle);
-			OutputDebugStringA(buffer);
-
-			// Eigentlich sollte ich hier die gleichen probleme haben wie bei sc_minimize,
-			// Ich glaub aber das des zu einer zeit war wo noch ein globaler hook gemacht wurde...
-			// Deshalb denk ich es ist ok wenn ich hier den namen nicht prüfe.
-			// NOTE: Ich mach es deshalb nicht weil das Fenster zu den zeitpunkt nicht auffindbar ist, was warscheinlich daran liegt das es bereits geschlossen wurde.
-
-			// Ich machs jetz so dass ich wenn ich das Whatsapp-Fenster nicht finde auch schließe, wegen den oben genannten gruenden.
-			// UPDATE 01.01.2019: Removed it because this check can fail if another window has this name and this code should only be injected into whatsapp now anyway.
-			//if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME) || FindWindow(NULL, WHATSAPP_CLIENT_NAME) == NULL) {
-				bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, reinterpret_cast<LPARAM>(msg->hwnd));
-				if (successfulSent) {
-					OutputDebugStringA(MODULE_NAME "WM_WHAHTSAPP_CLOSING successful sent.");
-				}
-			//}
 		}
+	} else if (msg->message == WM_NCDESTROY) {
+		uintptr_t handle1 = reinterpret_cast<uintptr_t>(msg->hwnd);
+		uintptr_t whatsappTrayWindowHandle = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
+		sprintf_s(buffer, sizeof(buffer), MODULE_NAME "WM_NCDESTROY hwnd=0x%llX whatsappTrayWindowHandle=0x%llX", handle1, whatsappTrayWindowHandle);
+		TraceString(buffer);
 
+		if (IsTopLevelWhatsApp(msg->hwnd)) {
+			bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, reinterpret_cast<LPARAM>(msg->hwnd));
+			if (successfulSent) {
+				TraceString(MODULE_NAME "WM_WHAHTSAPP_CLOSING successful sent.");
+			}
+		}
 	}
 
 	return CallNextHookEx(NULL, nCode, wParam, lParam);

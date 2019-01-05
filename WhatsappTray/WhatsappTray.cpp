@@ -30,6 +30,7 @@
 #include "AboutDialog.h"
 #include "Helper.h"
 #include "Logger.h"
+#include "Version.h"
 
 #include <Strsafe.h>
 #include <psapi.h>
@@ -61,7 +62,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 {
 	Logger::Setup();
 
-	Logger::Info(MODULE_NAME "::WinMain() - Starting WhatsappTray %s.", Helper::GetProductAndVersion().c_str());
+	Logger::Info(MODULE_NAME "::WinMain() - Starting WhatsappTray %s in %s CompileConfiguration.", Helper::GetProductAndVersion().c_str(), CompileConfiguration);
 
 	WhatsAppApi::Init();
 
@@ -81,6 +82,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		appData.CloseToTray.Set(true);
 	}
 	if (!(_hLib = LoadLibrary("Hook.dll"))) {
+		Logger::Error(MODULE_NAME "::WinMain() - Error loading Hook.dll.");
 		MessageBox(NULL, "Error loading Hook.dll.", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return 0;
 	}
@@ -102,15 +104,20 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	}
 
 	// Test if WhatsappTray is already running.
+	// NOTE: This also matches the class-name of the window so we can be sure its our window and not for example an explorer-window with this name.
 	_hwndWhatsappTray = FindWindow(NAME, NAME);
 	if (_hwndWhatsappTray) {
-		if (strstr(lpCmdLine, "--exit")) {
-			SendMessage(_hwndWhatsappTray, WM_CLOSE, 0, 0);
-		} else {
-			//MessageBox(NULL, "WhatsappTray is already running. Reapplying hook", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-			SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
-		}
-		return 0;
+		Logger::Error(MODULE_NAME "::WinMain() - Found an already open instance of WhatsappTray. Trying to close the other instance.");
+		Logger::Error(MODULE_NAME "::WinMain() - If this error persists, try to close the other instance by hand using for example the taskmanager.");
+		//if (strstr(lpCmdLine, "--exit")) {
+		SendMessage(_hwndWhatsappTray, WM_CLOSE, 0, 0);
+		//} else {
+		//	//MessageBox(NULL, "WhatsappTray is already running. Reapplying hook", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		//	SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
+		//}
+		//return 0;
+
+#pragma WARNING("It would be best to wait her a bit and check if it is still active. And if it is still active shoot it down.")
 	}
 
 	if (setHook() == false) {

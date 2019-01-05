@@ -74,6 +74,9 @@
     <ClInclude Include="WindowsMessage.h">
       <Filter>Files\Helper</Filter>
     </ClInclude>
+    <ClInclude Include="Version.h">
+      <Filter>Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Registry.cpp">
