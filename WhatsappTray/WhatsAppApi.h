@@ -28,15 +28,17 @@ class DirectoryWatcher;
 class WhatsAppApi
 {
 public:
-	WhatsAppApi() { }
-	~WhatsAppApi() { }
-	static void WhatsAppApi::Init();
 	static void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& newMessageHandler);
 	static void WhatsAppApi::NotifyOnFullInit(const std::function<void()>& newMessageHandler);
 private:
+	WhatsAppApi() { }
+	~WhatsAppApi() { }
 	static std::unique_ptr<DirectoryWatcher> dirWatcher;
 	static void IndexedDbChanged(const DWORD dwAction, std::string strFilename);
 	static std::function<void()> receivedMessageEvent;
 	static std::function<void()> receivedFullInitEvent;
+
+	/// Dummy-value used for initialization. Like a static constructor.
+	static bool initDone;
 };
 

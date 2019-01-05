@@ -39,6 +39,7 @@ public:
 	static HICON GetWindowIcon(HWND hwnd);
 	static std::string GetProductAndVersion();
 	static std::string GetStartMenuProgramsDirectory();
+	static std::string GetWindowsAppDataDirectory();
 	static std::string GetFilenameFromPath(std::string path);
 };
 

@@ -30,7 +30,8 @@ BETTER_ENUM(Data, uint8_t,
 	CLOSE_TO_TRAY,
 	LAUNCH_ON_WINDOWS_STARTUP,
 	START_MINIMIZED,
-	WHATSAPP_STARTPATH
+	WHATSAPP_STARTPATH,
+	WHATSAPP_ROAMING_DIRECTORY
 )
 
 class Serializeable
@@ -135,17 +136,20 @@ public:
 class AppData
 {
 public:
-	AppData();
-	~AppData() {}
 	static bool SetData(DataEntry& value);
-	std::string GetDataOrSetDefault(DataEntry& value);
+	static std::string GetDataOrSetDefault(DataEntry& value);
 
 	/// If true, the close-button of WhatsApp sends it to tray instead of closing.
-	DataEntryS<SBool> CloseToTray;
-	DataEntryS<SBool> LaunchOnWindowsStartup;
-	DataEntryS<SBool> StartMinimized;
-	DataEntryS<SString> WhatsappStartpath;
+	static DataEntryS<SBool> CloseToTray;
+	static DataEntryS<SBool> LaunchOnWindowsStartup;
+	static DataEntryS<SBool> StartMinimized;
+	static DataEntryS<SString> WhatsappStartpath;
+	static DataEntryS<SString> WhatsappRoamingDirectory;
 private:
+	AppData() {}
+
 	static std::string GetAppDataFilePath();
 	
+	/// Dummy-value used for initialization. Like a static constructor.
+	static bool initDone;
 };

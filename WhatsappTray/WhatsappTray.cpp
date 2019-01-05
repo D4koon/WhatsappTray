@@ -52,7 +52,6 @@ static HWND _hwndWhatsapp;
 
 static int messagesSinceMinimize = 0;
 
-static AppData appData;
 static Registry registry;
 static std::unique_ptr<TrayManager> trayManager;
 
@@ -69,8 +68,6 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	Logger::Info(MODULE_NAME "::WinMain() - Starting WhatsappTray %s in %s CompileConfiguration.", Helper::GetProductAndVersion().c_str(), CompileConfiguration);
 
-	WhatsAppApi::Init();
-
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
 
@@ -80,11 +77,11 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	_hInstance = hInstance;
 
 	// Setup the settings for launch on windows startup.
-	setLaunchOnWindowsStartupSetting(appData.LaunchOnWindowsStartup.Get());
+	setLaunchOnWindowsStartupSetting(AppData::LaunchOnWindowsStartup.Get());
 
 	// Check if closeToTray was set per commandline. (this overrides the persistent storage-value.)
 	if (strstr(lpCmdLine, "--closeToTray")) {
-		appData.CloseToTray.Set(true);
+		AppData::CloseToTray.Set(true);
 	}
 	if (!(_hLib = LoadLibrary("Hook.dll"))) {
 		Logger::Error(MODULE_NAME "::WinMain() - Error loading Hook.dll.");
@@ -96,12 +93,12 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		return 0;
 	}
 
-	if (appData.StartMinimized.Get()) {
+	if (AppData::StartMinimized.Get()) {
 		Logger::Info(MODULE_NAME "::WinMain() - Prepare for starting minimized.");
 
 		WhatsAppApi::NotifyOnFullInit([]() {
 			Logger::Info(MODULE_NAME "::WinMain() - NotifyOnFullInit");
-			Sleep(500);
+			Sleep(2000);
 			PostMessageA(_hwndWhatsappTray, WM_ADDTRAY, 0, 0);
 			// Remove event after the first execution
 			WhatsAppApi::NotifyOnFullInit(NULL);
@@ -160,7 +157,7 @@ HWND startWhatsapp()
 {
 	_hwndWhatsapp = findWhatsapp();
 
-	std::experimental::filesystem::path waStartPath = std::string(appData.WhatsappStartpath.Get());
+	std::experimental::filesystem::path waStartPath = std::string(AppData::WhatsappStartpath.Get());
 	std::string waStartPathString;
 	if (waStartPath.is_relative()) {
 		std::experimental::filesystem::path appPath = Helper::GetApplicationFilePath();
@@ -225,7 +222,7 @@ HWND findWhatsapp()
 		Logger::Info(MODULE_NAME "::startWhatsapp() - Filepath is: '%s'", filepath);
 
 		std::string filenameFromWindow = Helper::GetFilenameFromPath(filepath);
-		std::string filenameFromSettings = Helper::GetFilenameFromPath(appData.WhatsappStartpath.Get());
+		std::string filenameFromSettings = Helper::GetFilenameFromPath(AppData::WhatsappStartpath.Get());
 
 		// NOTE: I do not compare the extension because when i start from an link, the name is WhatsApp.lnk whicht does not match the WhatsApp.exe
 		// This could be improved by reading the real value from the .lnk but i think this should be fine for now.
@@ -284,21 +281,21 @@ void ExecuteMenu()
 	// - Display options.
 
 	// -- Close to Tray
-	if (appData.CloseToTray.Get()) {
+	if (AppData::CloseToTray.Get()) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_CLOSE_TO_TRAY, "Close to tray");
 	} else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_CLOSE_TO_TRAY, "Close to tray");
 	}
 
 	// -- Launch on Windows startup.
-	if (appData.LaunchOnWindowsStartup.Get()) {
+	if (AppData::LaunchOnWindowsStartup.Get()) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
 	} else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP, "Launch on Windows startup");
 	}
 
 	// -- Start minimized.
-	if (appData.StartMinimized.Get()) {
+	if (AppData::StartMinimized.Get()) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_START_MINIMIZED, "Start minimized");
 	} else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_START_MINIMIZED, "Start minimized");
@@ -333,18 +330,18 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 		{
 			// Toggle the 'close to tray'-feature.
 			// We have to first change the value and then unregister and register to set the ne value in the hook.
-			appData.CloseToTray.Set(!appData.CloseToTray.Get());
+			AppData::CloseToTray.Set(!AppData::CloseToTray.Get());
 
 			SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
 			break;
 		}
 		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP:
 			// Toggle the 'launch on windows startup'-feature.
-			setLaunchOnWindowsStartupSetting(!appData.LaunchOnWindowsStartup.Get());
+			setLaunchOnWindowsStartupSetting(!AppData::LaunchOnWindowsStartup.Get());
 			break;
 		case IDM_SETTING_START_MINIMIZED:
 			// Toggle the 'start minimized'-feature.
-			appData.StartMinimized.Set(!appData.StartMinimized.Get());
+			AppData::StartMinimized.Set(!AppData::StartMinimized.Get());
 			break;
 		case IDM_RESTORE:
 			Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - IDM_RESTORE");
@@ -423,7 +420,7 @@ bool setHook()
 		return false;
 	}
 
-	if (RegisterHook(_hLib, threadId, appData.CloseToTray.Get()) == false) {
+	if (RegisterHook(_hLib, threadId, AppData::CloseToTray.Get()) == false) {
 		MessageBox(NULL, "Error setting hook procedure.", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return false;
 	}
@@ -435,7 +432,7 @@ bool setHook()
  */
 void setLaunchOnWindowsStartupSetting(bool value)
 {
-	appData.LaunchOnWindowsStartup.Set(value);
+	AppData::LaunchOnWindowsStartup.Set(value);
 
 	if (value) {
 		registry.RegisterProgram();

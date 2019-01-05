@@ -28,6 +28,9 @@
 #include <sstream>
 #include <Shlobj.h>
 
+#undef MODULE_NAME
+#define MODULE_NAME "Helper::"
+
 /*
 * @brief Get the Path to the exe-file of the application.
 */
@@ -166,6 +169,17 @@ std::string Helper::GetStartMenuProgramsDirectory()
 	std::string startMenuPrograms = Helper::ToString(startMenuProgramsBuffer);
 	CoTaskMemFree(startMenuProgramsBuffer);
 	return startMenuPrograms;
+}
+
+std::string Helper::GetWindowsAppDataDirectory()
+{
+	char appDataDirectory[MAX_PATH] = { 0 };
+	if (SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, appDataDirectory) != S_OK) {
+		Logger::Fatal(MODULE_NAME "Init() - Could not get the AppData-directory!");
+		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the AppData-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		return "";
+	}
+	return appDataDirectory;
 }
 
 std::string Helper::GetFilenameFromPath(std::string path)

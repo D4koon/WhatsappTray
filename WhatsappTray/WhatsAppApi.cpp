@@ -24,6 +24,7 @@
 #include "WhatsAppApi.h"
 
 #include "DirectoryWatcher.h"
+#include "AppData.h"
 #include "Logger.h"
 
 #include <regex>
@@ -42,24 +43,35 @@ std::unique_ptr<DirectoryWatcher> WhatsAppApi::dirWatcher = std::unique_ptr<Dire
 std::function<void()> WhatsAppApi::receivedMessageEvent = NULL;
 std::function<void()> WhatsAppApi::receivedFullInitEvent = NULL;
 
-void WhatsAppApi::Init()
+/// Initialize the dummy-value initDone with a lambda to get a static-constructor like behavior.
+bool WhatsAppApi::initDone([]()
 {
-	char appDataDirectory[MAX_PATH] = { 0 };
-	if (SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, appDataDirectory) != S_OK) {
-		Logger::Fatal(MODULE_NAME "Init() - Could not get the AppData-directory!");
-		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the AppData-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-		return;
+	auto leveldbDirectory = std::string(AppData::WhatsappRoamingDirectory.Get());
+
+	// Add a slash to the end of the path if ther is none.
+	auto lastCharacter = leveldbDirectory[leveldbDirectory.length() - 1];
+	if (lastCharacter != '\\') {
+		leveldbDirectory.append("\\");
 	}
-	std::string leveldbDirectory = std::string(appDataDirectory) + "\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb";
+
+	leveldbDirectory.append("WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb");
+
+	//fs::path test = fs::path(std::string(AppData::WhatsappRoamingDirectory.Get()));
+	//fs::path test3("\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb");
+	//auto combinedPath = test / test3;
+	//auto test2 = test.string();
+	//std::string leveldbDirectory = std::string(AppData::WhatsappRoamingDirectory.Get()) + "\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb";
 	Logger::Info(MODULE_NAME "Init() - Using leveldb-directory:%s", leveldbDirectory.c_str());
 
 	if (fs::exists(fs::path(leveldbDirectory)) == false) {
 		Logger::Fatal(MODULE_NAME "Init() - Could not get the leveldb-directory!");
 		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the leveldb-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-		return;
+		return false;
 	}
 	WhatsAppApi::dirWatcher = std::unique_ptr<DirectoryWatcher>(new DirectoryWatcher(leveldbDirectory, &WhatsAppApi::IndexedDbChanged));
-}
+
+	return true;
+}());
 
 void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& receivedMessageHandler)
 {

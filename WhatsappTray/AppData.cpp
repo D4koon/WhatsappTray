@@ -32,19 +32,25 @@
 #define MODULE_NAME "AppData::"
 
 /**
- * The data-storage for the application.
+ * Initialize the data-storage for the application.
  */
-AppData::AppData()
-	: CloseToTray(Data::CLOSE_TO_TRAY, false, &AppData::SetData)
-	, LaunchOnWindowsStartup(Data::LAUNCH_ON_WINDOWS_STARTUP, false, &AppData::SetData)
-	, StartMinimized(Data::START_MINIMIZED, false, &AppData::SetData)
-	, WhatsappStartpath(Data::WHATSAPP_STARTPATH, Helper::GetStartMenuProgramsDirectory() + "\\WhatsApp\\WhatsApp.lnk", &AppData::SetData)
+DataEntryS<SBool> AppData::CloseToTray(Data::CLOSE_TO_TRAY, false, &AppData::SetData);
+DataEntryS<SBool> AppData::LaunchOnWindowsStartup(Data::LAUNCH_ON_WINDOWS_STARTUP, false, &AppData::SetData);
+DataEntryS<SBool> AppData::StartMinimized(Data::START_MINIMIZED, false, &AppData::SetData);
+DataEntryS<SString> AppData::WhatsappStartpath(Data::WHATSAPP_STARTPATH, Helper::GetStartMenuProgramsDirectory() + "\\WhatsApp\\WhatsApp.lnk", &AppData::SetData);
+DataEntryS<SString> AppData::WhatsappRoamingDirectory(Data::WHATSAPP_ROAMING_DIRECTORY, Helper::GetWindowsAppDataDirectory(), &AppData::SetData);
+
+/// Initialize the dummy-value initDone with a lambda to get a static-constructor like behavior.
+bool AppData::initDone([]() 
 {
 	CloseToTray.Get().FromString(GetDataOrSetDefault(CloseToTray));
 	LaunchOnWindowsStartup.Get().FromString(GetDataOrSetDefault(LaunchOnWindowsStartup));
 	StartMinimized.Get().FromString(GetDataOrSetDefault(StartMinimized));
 	WhatsappStartpath.Get().FromString(GetDataOrSetDefault(WhatsappStartpath));
-}
+	WhatsappRoamingDirectory.Get().FromString(GetDataOrSetDefault(WhatsappRoamingDirectory));
+
+	return true; 
+}());
 
 /*
 * Set the data in the persistant storage.

@@ -87,12 +87,11 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 
 	CWPSTRUCT* msg = reinterpret_cast<CWPSTRUCT*>(lParam);
 
-	char windowNameBuffer[2000];
-	GetWindowTextA(msg->hwnd, windowNameBuffer, sizeof(windowNameBuffer));
-
 	char buffer[2000];
-	sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc windowNameBuffer='%s' msg->hwnd='0x%lX' message=%s(0x%lX) wParam=0x%llX", windowNameBuffer, GetAncestor(msg->hwnd, GA_ROOT), WindowsMessage::GetString(msg->message).c_str(), msg->message, msg->wParam);
-	TraceString(buffer);
+	//char windowNameBuffer[2000];
+	//GetWindowTextA(msg->hwnd, windowNameBuffer, sizeof(windowNameBuffer));
+	//sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc windowNameBuffer='%s' msg->hwnd='0x%lX' message=%s(0x%lX) wParam=0x%llX", windowNameBuffer, GetAncestor(msg->hwnd, GA_ROOT), WindowsMessage::GetString(msg->message).c_str(), msg->message, msg->wParam);
+	//TraceString(buffer);
 
 	if (msg->message == WM_SYSCOMMAND) {
 		// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
