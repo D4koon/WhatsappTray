@@ -34,6 +34,7 @@
 #include <Strsafe.h>
 #include <psapi.h>
 #include <filesystem>
+#include <vector>
 
 #ifdef _DEBUG
 constexpr auto CompileConfiguration = "Debug";
@@ -52,7 +53,6 @@ static HWND _hwndWhatsapp;
 
 static int messagesSinceMinimize = 0;
 
-static Registry registry;
 static std::unique_ptr<TrayManager> trayManager;
 
 LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -435,8 +435,8 @@ void setLaunchOnWindowsStartupSetting(bool value)
 	AppData::LaunchOnWindowsStartup.Set(value);
 
 	if (value) {
-		registry.RegisterProgram();
+		Registry::RegisterProgram();
 	} else {
-		registry.UnregisterProgram();
+		Registry::UnregisterProgram();
 	}
 }

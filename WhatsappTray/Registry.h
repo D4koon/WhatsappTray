@@ -26,13 +26,13 @@
 class Registry
 {
 public:
+	static void RegisterProgram();
+	static bool RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args);
+	static bool IsMyProgramRegisteredForStartup(LPTSTR pszAppName);
+	static void UnregisterProgram();
+private:
 	Registry() { }
 	~Registry() { }
-	void RegisterProgram();
-	bool RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args);
-	bool IsMyProgramRegisteredForStartup(LPTSTR pszAppName);
-	void UnregisterProgram();
-private:
 	static const LPTSTR applicatinName;
 };
 

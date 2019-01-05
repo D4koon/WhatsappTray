@@ -56,11 +56,6 @@ bool WhatsAppApi::initDone([]()
 
 	leveldbDirectory.append("WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb");
 
-	//fs::path test = fs::path(std::string(AppData::WhatsappRoamingDirectory.Get()));
-	//fs::path test3("\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb");
-	//auto combinedPath = test / test3;
-	//auto test2 = test.string();
-	//std::string leveldbDirectory = std::string(AppData::WhatsappRoamingDirectory.Get()) + "\\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb";
 	Logger::Info(MODULE_NAME "Init() - Using leveldb-directory:%s", leveldbDirectory.c_str());
 
 	if (fs::exists(fs::path(leveldbDirectory)) == false) {
