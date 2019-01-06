@@ -26,6 +26,7 @@
 
 #include "DirectoryWatcher.h"
 #include "AppData.h"
+#include "Helper.h"
 #include "Logger.h"
 
 #include <regex>
@@ -46,7 +47,7 @@ std::function<void()> WhatsAppApi::receivedFullInitEvent = NULL;
 /// Initialize the class.
 void WhatsAppApi::Init()
 {
-	auto leveldbDirectory = std::string(AppData::WhatsappRoamingDirectory.Get());
+	std::string leveldbDirectory = std::string(AppData::WhatsappRoamingDirectory.Get());
 
 	// Add a slash to the end of the path if ther is none.
 	auto lastCharacter = leveldbDirectory[leveldbDirectory.length() - 1];
@@ -54,7 +55,18 @@ void WhatsAppApi::Init()
 		leveldbDirectory.append("\\");
 	}
 
-	leveldbDirectory.append("WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb");
+	leveldbDirectory.append("WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb\\");
+
+	fs::path leveldbDirectoryPath(leveldbDirectory);
+	if (leveldbDirectoryPath.is_relative()) {
+		fs::path appPath = Helper::GetApplicationFilePath();
+		auto combinedPath = appPath / leveldbDirectoryPath;
+		Logger::Info(MODULE_NAME "Init() - Setting leveldb-directory-path to combinedPath:%s", combinedPath.string().c_str());
+
+		// Shorten the path by converting to absoltue path.
+		auto combinedPathCanonical = fs::canonical(combinedPath);
+		leveldbDirectory = combinedPathCanonical.string();
+	}
 
 	Logger::Info(MODULE_NAME "Init() - Using leveldb-directory:%s", leveldbDirectory.c_str());
 
