@@ -42,7 +42,6 @@ Logger::~Logger()
 
 /**
  * Setup the logging.
- * TODO: Maybe check sometime if the init could be done like in AppData with a static-bool that uses a lambda to create a static-constructor-like behavior.
  */
 void Logger::Setup()
 {

@@ -21,6 +21,7 @@
 
 #include "stdafx.h"
 #include "WhatsappTray.h"
+#include "SharedDefines.h"
 #include "resource.h"
 
 #include "AppData.h"
@@ -34,7 +35,6 @@
 #include <Strsafe.h>
 #include <psapi.h>
 #include <filesystem>
-#include <vector>
 
 #ifdef _DEBUG
 constexpr auto CompileConfiguration = "Debug";
@@ -64,17 +64,19 @@ void setLaunchOnWindowsStartupSetting(bool value);
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
+	_hInstance = hInstance;
+
 	Logger::Setup();
 
 	Logger::Info(MODULE_NAME "::WinMain() - Starting WhatsappTray %s in %s CompileConfiguration.", Helper::GetProductAndVersion().c_str(), CompileConfiguration);
+
+	WhatsAppApi::Init();
 
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
 
 	// Initialize GDI+.
 	Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
-
-	_hInstance = hInstance;
 
 	// Setup the settings for launch on windows startup.
 	setLaunchOnWindowsStartupSetting(AppData::LaunchOnWindowsStartup.Get());
@@ -83,6 +85,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	if (strstr(lpCmdLine, "--closeToTray")) {
 		AppData::CloseToTray.Set(true);
 	}
+
 	if (!(_hLib = LoadLibrary("Hook.dll"))) {
 		Logger::Error(MODULE_NAME "::WinMain() - Error loading Hook.dll.");
 		MessageBox(NULL, "Error loading Hook.dll.", "WhatsappTray", MB_OK | MB_ICONERROR);

@@ -40,7 +40,7 @@ DataEntryS<SBool> AppData::StartMinimized(Data::START_MINIMIZED, false, &AppData
 DataEntryS<SString> AppData::WhatsappStartpath(Data::WHATSAPP_STARTPATH, Helper::GetStartMenuProgramsDirectory() + "\\WhatsApp\\WhatsApp.lnk", &AppData::SetData);
 DataEntryS<SString> AppData::WhatsappRoamingDirectory(Data::WHATSAPP_ROAMING_DIRECTORY, Helper::GetWindowsAppDataDirectory(), &AppData::SetData);
 
-/// Initialize the dummy-value initDone with a lambda to get a static-constructor like behavior.
+/// Initialize the dummy-value initDone with a lambda to get a static-constructor like behavior. NOTE: The disadvantage is though that we can not control the order. For example if we want to make sure that the logger inits first.
 bool AppData::initDone([]() 
 {
 	CloseToTray.Get().FromString(GetDataOrSetDefault(CloseToTray));

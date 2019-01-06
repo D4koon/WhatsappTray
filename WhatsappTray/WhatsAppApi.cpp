@@ -22,6 +22,7 @@
 #include "stdafx.h"
 
 #include "WhatsAppApi.h"
+#include "WhatsappTray.h"
 
 #include "DirectoryWatcher.h"
 #include "AppData.h"
@@ -37,14 +38,13 @@ namespace fs = std::experimental::filesystem;
 #undef MODULE_NAME
 #define MODULE_NAME "WhatsAppApi::"
 
-
 std::unique_ptr<DirectoryWatcher> WhatsAppApi::dirWatcher = std::unique_ptr<DirectoryWatcher>(nullptr);
 
 std::function<void()> WhatsAppApi::receivedMessageEvent = NULL;
 std::function<void()> WhatsAppApi::receivedFullInitEvent = NULL;
 
-/// Initialize the dummy-value initDone with a lambda to get a static-constructor like behavior.
-bool WhatsAppApi::initDone([]()
+/// Initialize the class.
+void WhatsAppApi::Init()
 {
 	auto leveldbDirectory = std::string(AppData::WhatsappRoamingDirectory.Get());
 
@@ -61,12 +61,10 @@ bool WhatsAppApi::initDone([]()
 	if (fs::exists(fs::path(leveldbDirectory)) == false) {
 		Logger::Fatal(MODULE_NAME "Init() - Could not get the leveldb-directory!");
 		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the leveldb-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-		return false;
+		return;
 	}
 	WhatsAppApi::dirWatcher = std::unique_ptr<DirectoryWatcher>(new DirectoryWatcher(leveldbDirectory, &WhatsAppApi::IndexedDbChanged));
-
-	return true;
-}());
+}
 
 void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& receivedMessageHandler)
 {

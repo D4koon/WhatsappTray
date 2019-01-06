@@ -19,8 +19,7 @@
 *
 */
 
-#include <windows.h>
-#include "WhatsappTray.h"
+#include "SharedDefines.h"
 #include "WindowsMessage.h"
 
 #include <iostream>

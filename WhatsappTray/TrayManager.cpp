@@ -25,6 +25,7 @@
 #include "Helper.h"
 #include "Logger.h"
 #include "WhatsappTray.h"
+#include "SharedDefines.h"
 
 using namespace Gdiplus;
 
