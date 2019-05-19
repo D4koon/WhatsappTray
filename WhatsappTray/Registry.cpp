@@ -102,7 +102,7 @@ bool Registry::IsMyProgramRegisteredForStartup(LPTSTR pszAppName)
 	LONG lResult = 0;
 	bool fSuccess = TRUE;
 	DWORD dwRegType = REG_SZ;
-	wchar_t szPathToExe[MAX_PATH] = { 0 };
+	TCHAR szPathToExe[MAX_PATH] = { 0 };
 	DWORD dwSize = sizeof(szPathToExe);
 
 	lResult = RegOpenKeyEx(HKEY_CURRENT_USER, TEXT("Software\\Microsoft\\Windows\\CurrentVersion\\Run"), 0, KEY_READ, &hKey);
@@ -115,7 +115,7 @@ bool Registry::IsMyProgramRegisteredForStartup(LPTSTR pszAppName)
 	}
 
 	if (fSuccess) {
-		fSuccess = (wcslen(szPathToExe) > 0) ? TRUE : FALSE;
+		fSuccess = (lstrlen(szPathToExe) > 0) ? TRUE : FALSE;
 	}
 
 	if (hKey != NULL) {
