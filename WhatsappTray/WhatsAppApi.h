@@ -35,7 +35,7 @@ private:
 	WhatsAppApi() { }
 	~WhatsAppApi() { }
 	static std::unique_ptr<DirectoryWatcher> dirWatcher;
-	static void IndexedDbChanged(const DWORD dwAction, std::string strFilename);
+	static void IndexedDbChanged(const DWORD dwAction, std::wstring strFilename);
 	static std::function<void()> receivedMessageEvent;
 	static std::function<void()> receivedFullInitEvent;
 };

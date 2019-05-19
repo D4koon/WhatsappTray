@@ -47,28 +47,28 @@ std::function<void()> WhatsAppApi::receivedFullInitEvent = NULL;
 /// Initialize the class.
 void WhatsAppApi::Init()
 {
-	std::string leveldbDirectory = std::string(AppData::WhatsappRoamingDirectory.Get());
+	std::wstring leveldbDirectory = Helper::Utf8ToWide(std::string(AppData::WhatsappRoamingDirectory.Get()));
 
 	// Add a slash to the end of the path if ther is none.
 	auto lastCharacter = leveldbDirectory[leveldbDirectory.length() - 1];
 	if (lastCharacter != '\\') {
-		leveldbDirectory.append("\\");
+		leveldbDirectory.append(L"\\");
 	}
 
-	leveldbDirectory.append("WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb\\");
+	leveldbDirectory.append(L"WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb\\");
 
 	fs::path leveldbDirectoryPath(leveldbDirectory);
 	if (leveldbDirectoryPath.is_relative()) {
 		fs::path appPath = Helper::GetApplicationFilePath();
 		auto combinedPath = appPath / leveldbDirectoryPath;
-		Logger::Info(MODULE_NAME "Init() - Setting leveldb-directory-path to combinedPath:%s", combinedPath.string().c_str());
+		Logger::Info(MODULE_NAME "Init() - Setting leveldb-directory-path to combinedPath:%s", Helper::WideToUtf8(combinedPath.wstring()).c_str());
 
 		// Shorten the path by converting to absoltue path.
 		auto combinedPathCanonical = fs::canonical(combinedPath);
-		leveldbDirectory = combinedPathCanonical.string();
+		leveldbDirectory = combinedPathCanonical.wstring();
 	}
 
-	Logger::Info(MODULE_NAME "Init() - Using leveldb-directory:%s", leveldbDirectory.c_str());
+	Logger::Info(MODULE_NAME "Init() - Using leveldb-directory:%s", Helper::WideToUtf8(leveldbDirectory).c_str());
 
 	if (fs::exists(fs::path(leveldbDirectory)) == false) {
 		Logger::Fatal(MODULE_NAME "Init() - Could not get the leveldb-directory!");
@@ -90,14 +90,15 @@ void WhatsAppApi::NotifyOnFullInit(const std::function<void()>& receivedStatusV3
 
 /**
  * NOTE: I noticed false positives when Whatsapp is started an not yet fully initialized.
+ * NOTE: It is better to use wstring for paths because of unicode-charcters that can happen in other languages
  */
-void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::string strFilename)
+void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::wstring strFilename)
 {
 	// The logfiles change so we have to keep track of them.
-	static std::string lastLogfile = "";
+	static std::wstring lastLogfile = L"";
 	static size_t processedLineCount = 0;
 
-	if (strFilename.find(".log") == std::string::npos) {
+	if (strFilename.find(L".log") == std::string::npos) {
 		return;
 	}
 
@@ -186,6 +187,5 @@ void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::string strFilename
 			}
 		}
 
-		
 	}
 }

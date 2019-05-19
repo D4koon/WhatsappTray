@@ -43,7 +43,7 @@ class CReadChangesServer;
 class CReadChangesRequest
 {
 public:
-	CReadChangesRequest(CReadChangesServer* pServer, LPCTSTR sz, BOOL b, DWORD dw, DWORD size);
+	CReadChangesRequest(CReadChangesServer* pServer, LPCWSTR sz, BOOL b, DWORD dw, DWORD size);
 
 	~CReadChangesRequest();
 

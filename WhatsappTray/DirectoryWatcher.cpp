@@ -23,9 +23,13 @@
 
 #include "DirectoryWatcher.h"
 #include "Logger.h"
+#include "Helper.h"
 #include "ReadDirectoryChanges/ReadDirectoryChanges.h"
 
-DirectoryWatcher::DirectoryWatcher(std::string directory, const std::function<void(const DWORD, std::string)>& directoryChangedHandler)
+/*
+ * NOTE: It is better to use wstring for paths because of unicode-charcters that can happen in other languages
+ */
+DirectoryWatcher::DirectoryWatcher(std::wstring directory, const std::function<void(const DWORD, std::wstring)>& directoryChangedHandler)
 	: watchedDirectory(directory)
 	, directoryChangedEvent(directoryChangedHandler)
 	, watcherThread(&DirectoryWatcher::WatchDirectoryWorker, this, directory)
@@ -40,7 +44,7 @@ DirectoryWatcher::~DirectoryWatcher()
 	StopThread();
 }
 
-void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
+void DirectoryWatcher::WatchDirectoryWorker(std::wstring directory)
 {
 	const DWORD dwNotificationFlags =
 		FILE_NOTIFY_CHANGE_LAST_WRITE
@@ -69,7 +73,7 @@ void DirectoryWatcher::WatchDirectoryWorker(std::string directory)
 				changes.Pop(dwAction, strFilename);
 				Logger::Debug("%s %s", CReadDirectoryChanges::ActionToString(dwAction).c_str(), strFilename);
 
-				directoryChangedEvent(dwAction, std::string(strFilename));
+				directoryChangedEvent(dwAction, Helper::Utf8ToWide(std::string(strFilename)));
 			}
 		}
 		break;

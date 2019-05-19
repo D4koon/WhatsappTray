@@ -116,7 +116,7 @@ public:
 	/// ReadDirectoryChangesW call for the given directory with the given flags.
 	/// </para>
 	/// </remarks>
-	void AddDirectory(LPCTSTR wszDirectory, BOOL bWatchSubtree, DWORD dwNotifyFilter, DWORD dwBufferSize=16384);
+	void AddDirectory(LPCWSTR wszDirectory, BOOL bWatchSubtree, DWORD dwNotifyFilter, DWORD dwBufferSize=16384);
 
 	/// <summary>
 	/// Return a handle for the Win32 Wait... functions that will be

@@ -162,7 +162,7 @@ HWND startWhatsapp()
 {
 	_hwndWhatsapp = findWhatsapp();
 
-	fs::path waStartPath = std::string(AppData::WhatsappStartpath.Get());
+	fs::path waStartPath = Helper::Utf8ToWide(std::string(AppData::WhatsappStartpath.Get()));
 	std::string waStartPathString;
 	if (waStartPath.is_relative()) {
 		fs::path appPath = Helper::GetApplicationFilePath();
@@ -221,18 +221,19 @@ HWND findWhatsapp()
 			continue;
 		}
 
-		char filepath[MAX_PATH];
-		if (GetModuleFileNameExA(processHandle, NULL, filepath, MAX_PATH) == 0) {
+		wchar_t filepath[MAX_PATH];
+		if (GetModuleFileNameExW(processHandle, NULL, filepath, MAX_PATH) == 0) {
 			CloseHandle(processHandle);
 			Logger::Error(MODULE_NAME "::startWhatsapp() - Failed to get module filepath.");
 			continue;
 		}
 		CloseHandle(processHandle);
 
-		Logger::Info(MODULE_NAME "::startWhatsapp() - Filepath is: '%s'", filepath);
+		Logger::Info(MODULE_NAME "::startWhatsapp() - Filepath is: '%s'", Helper::WideToUtf8(filepath).c_str());
 
-		std::string filenameFromWindow = Helper::GetFilenameFromPath(filepath);
-		std::string filenameFromSettings = Helper::GetFilenameFromPath(AppData::WhatsappStartpath.Get());
+		std::wstring filenameFromWindow = Helper::GetFilenameFromPath(filepath);
+		std::wstring whatsappStartpathWide = Helper::Utf8ToWide(AppData::WhatsappStartpath.Get());
+		std::wstring filenameFromSettings = Helper::GetFilenameFromPath(whatsappStartpathWide);
 
 		// NOTE: I do not compare the extension because when i start from an link, the name is WhatsApp.lnk whicht does not match the WhatsApp.exe
 		// This could be improved by reading the real value from the .lnk but i think this should be fine for now.

@@ -43,11 +43,13 @@ DataEntryS<SString> AppData::WhatsappRoamingDirectory(Data::WHATSAPP_ROAMING_DIR
 /// Initialize the dummy-value initDone with a lambda to get a static-constructor like behavior. NOTE: The disadvantage is though that we can not control the order. For example if we want to make sure that the logger inits first.
 bool AppData::initDone([]() 
 {
-	CloseToTray.Get().FromString(GetDataOrSetDefault(CloseToTray));
-	LaunchOnWindowsStartup.Get().FromString(GetDataOrSetDefault(LaunchOnWindowsStartup));
-	StartMinimized.Get().FromString(GetDataOrSetDefault(StartMinimized));
-	WhatsappStartpath.Get().FromString(GetDataOrSetDefault(WhatsappStartpath));
-	WhatsappRoamingDirectory.Get().FromString(GetDataOrSetDefault(WhatsappRoamingDirectory));
+	// Currently the DataEntries hold the default value.
+	// Now we look vor values in the config-file and write those if they exist.
+	CloseToTray.Get().SetAsString(GetDataOrSetDefault(CloseToTray));
+	LaunchOnWindowsStartup.Get().SetAsString(GetDataOrSetDefault(LaunchOnWindowsStartup));
+	StartMinimized.Get().SetAsString(GetDataOrSetDefault(StartMinimized));
+	WhatsappStartpath.Get().SetAsString(GetDataOrSetDefault(WhatsappStartpath));
+	WhatsappRoamingDirectory.Get().SetAsString(GetDataOrSetDefault(WhatsappRoamingDirectory));
 
 	return true; 
 }());

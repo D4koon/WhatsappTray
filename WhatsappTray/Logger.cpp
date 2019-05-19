@@ -201,7 +201,8 @@ void Logger::ProcessLog(const Loglevel loglevel, const char* logTextBuffer)
 
 	// Log everything to VS-console/DebugView for debugging.
 #ifdef _DEBUG
-	OutputDebugStringA(logText.c_str());
+	std::wstring wideLogText = Helper::Utf8ToWide(logText);
+	OutputDebugStringW(wideLogText.c_str());
 #endif
 
 	// If the loglevel is above the maximum, nothing shall be loged.

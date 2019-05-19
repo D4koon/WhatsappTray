@@ -28,16 +28,16 @@
 class DirectoryWatcher
 {
 public:
-	DirectoryWatcher(std::string directory, const std::function<void(const DWORD, std::string)>& directoryChangedHandler);
+	DirectoryWatcher(std::wstring directory, const std::function<void(const DWORD, std::wstring)>& directoryChangedHandler);
 	~DirectoryWatcher();
 private:
-	std::string watchedDirectory;
-	const std::function<void(const DWORD, std::string)> directoryChangedEvent;
+	std::wstring watchedDirectory;
+	const std::function<void(const DWORD, std::wstring)> directoryChangedEvent;
 	std::thread watcherThread;
 	volatile bool terminate;
 	HANDLE WaitHandle;
 
-	void WatchDirectoryWorker(std::string directory);
+	void WatchDirectoryWorker(std::wstring directory);
 	void StopThread();
 };
 

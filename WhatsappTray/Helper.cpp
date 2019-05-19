@@ -106,6 +106,22 @@ std::string Helper::ToString(const std::wstring& inputString)
 	return outputString;
 }
 
+std::wstring Helper::Utf8ToWide(const std::string& inputString)
+{
+	int size_needed = MultiByteToWideChar(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), NULL, 0);
+	std::wstring wstrTo(size_needed, 0);
+	MultiByteToWideChar(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), &wstrTo[0], size_needed);
+	return wstrTo;
+}
+
+std::string Helper::WideToUtf8(const std::wstring& inputString)
+{
+	int size_needed = WideCharToMultiByte(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), NULL, 0, NULL, NULL);
+	std::string strTo(size_needed, 0);
+	WideCharToMultiByte(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), &strTo[0], size_needed, NULL, NULL);
+	return strTo;
+}
+
 HICON Helper::GetWindowIcon(HWND hwnd)
 {
 	HICON icon;
@@ -184,9 +200,18 @@ std::string Helper::GetWindowsAppDataDirectory()
 
 std::string Helper::GetFilenameFromPath(std::string path)
 {
-	char filename[MAX_PATH];
-	char extension[MAX_PATH];
-	_splitpath_s(path.c_str(), NULL, NULL, NULL, NULL, filename, sizeof(filename), extension, sizeof(extension));
+	std::string filename(MAX_PATH, 0);
+	std::string extension(MAX_PATH, 0);
+	_splitpath_s(path.c_str(), NULL, NULL, NULL, NULL, &filename[0], filename.length(), &extension[0], extension.length());
 
-	return std::string(filename);
+	return filename;
+}
+
+std::wstring Helper::GetFilenameFromPath(std::wstring path)
+{
+	std::wstring filename(MAX_PATH, 0);
+	std::wstring extension(MAX_PATH, 0);
+	_wsplitpath_s(path.c_str(), NULL, NULL, NULL, NULL, &filename[0], filename.length(), &extension[0], extension.length());
+
+	return filename;
 }

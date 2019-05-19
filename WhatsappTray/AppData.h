@@ -58,7 +58,7 @@ public:
 	std::string ToString() {
 		return this->Value ? "1" : "0";
 	}
-	void FromString(std::string valueAsString)
+	void SetAsString(std::string valueAsString)
 	{
 		Value = valueAsString.compare("1") == 0;
 		valueChanged();
@@ -80,7 +80,7 @@ public:
 	std::string ToString() {
 		return this->Value;
 	}
-	void FromString(std::string valueAsString)
+	void SetAsString(std::string valueAsString)
 	{
 		Value = valueAsString;
 		valueChanged();
@@ -139,11 +139,13 @@ public:
 	static bool SetData(DataEntry& value);
 	static std::string GetDataOrSetDefault(DataEntry& value);
 
-	/// If true, the close-button of WhatsApp sends it to tray instead of closing.
+	// If true, the close-button of WhatsApp sends it to tray instead of closing.
 	static DataEntryS<SBool> CloseToTray;
 	static DataEntryS<SBool> LaunchOnWindowsStartup;
 	static DataEntryS<SBool> StartMinimized;
+	// NOTE: UTF8-string.
 	static DataEntryS<SString> WhatsappStartpath;
+	// NOTE: UTF8-string.
 	static DataEntryS<SString> WhatsappRoamingDirectory;
 private:
 	AppData() {}

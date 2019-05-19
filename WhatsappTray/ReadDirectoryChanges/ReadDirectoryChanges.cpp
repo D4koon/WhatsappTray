@@ -76,7 +76,7 @@ void CReadDirectoryChanges::Terminate()
 	}
 }
 
-void CReadDirectoryChanges::AddDirectory(LPCTSTR szDirectory, BOOL bWatchSubtree, DWORD dwNotifyFilter, DWORD dwBufferSize)
+void CReadDirectoryChanges::AddDirectory(LPCWSTR szDirectory, BOOL bWatchSubtree, DWORD dwNotifyFilter, DWORD dwBufferSize)
 {
 	if (m_hThread == NULL) {
 		Init();
