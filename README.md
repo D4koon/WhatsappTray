@@ -5,6 +5,9 @@ Extension for the Whatsapp Desktop Client, that enables minimize-to-tray and clo
 **Whatsapp Desktop Client**:
 You can download that in the [Whatsapp Official Page](https://www.whatsapp.com/download/)
 
+## Silent install
+Start a command line in the same folder where the .exe is located and start the .exe file with the parameters /Silent to install WhatsApp Tray without user input.
+
 ## Notice:
 **DONT** start the application with adminstrative rights unless your Whatsapp is also running with adminstrative rights.
 Otherwise it will **not work** because of communicationproblems between the two applications.
