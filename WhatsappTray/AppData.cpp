@@ -37,6 +37,7 @@
 DataEntryS<SBool> AppData::CloseToTray(Data::CLOSE_TO_TRAY, false, &AppData::SetData);
 DataEntryS<SBool> AppData::LaunchOnWindowsStartup(Data::LAUNCH_ON_WINDOWS_STARTUP, false, &AppData::SetData);
 DataEntryS<SBool> AppData::StartMinimized(Data::START_MINIMIZED, false, &AppData::SetData);
+DataEntryS<SBool> AppData::ShowUnreadMessages(Data::SHOW_UNREAD_MESSAGES, false, &AppData::SetData);
 DataEntryS<SString> AppData::WhatsappStartpath(Data::WHATSAPP_STARTPATH, Helper::GetStartMenuProgramsDirectory() + "\\WhatsApp\\WhatsApp.lnk", &AppData::SetData);
 DataEntryS<SString> AppData::WhatsappRoamingDirectory(Data::WHATSAPP_ROAMING_DIRECTORY, Helper::GetWindowsAppDataDirectory(), &AppData::SetData);
 
@@ -48,6 +49,7 @@ bool AppData::initDone([]()
 	CloseToTray.Get().SetAsString(GetDataOrSetDefault(CloseToTray));
 	LaunchOnWindowsStartup.Get().SetAsString(GetDataOrSetDefault(LaunchOnWindowsStartup));
 	StartMinimized.Get().SetAsString(GetDataOrSetDefault(StartMinimized));
+	ShowUnreadMessages.Get().SetAsString(GetDataOrSetDefault(ShowUnreadMessages));
 	WhatsappStartpath.Get().SetAsString(GetDataOrSetDefault(WhatsappStartpath));
 	WhatsappRoamingDirectory.Get().SetAsString(GetDataOrSetDefault(WhatsappRoamingDirectory));
 

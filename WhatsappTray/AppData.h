@@ -30,6 +30,7 @@ BETTER_ENUM(Data, uint8_t,
 	CLOSE_TO_TRAY,
 	LAUNCH_ON_WINDOWS_STARTUP,
 	START_MINIMIZED,
+	SHOW_UNREAD_MESSAGES,
 	WHATSAPP_STARTPATH,
 	WHATSAPP_ROAMING_DIRECTORY
 )
@@ -143,6 +144,7 @@ public:
 	static DataEntryS<SBool> CloseToTray;
 	static DataEntryS<SBool> LaunchOnWindowsStartup;
 	static DataEntryS<SBool> StartMinimized;
+	static DataEntryS<SBool> ShowUnreadMessages;
 	// NOTE: UTF8-string.
 	static DataEntryS<SString> WhatsappStartpath;
 	// NOTE: UTF8-string.

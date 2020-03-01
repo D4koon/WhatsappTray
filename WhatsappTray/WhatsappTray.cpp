@@ -312,6 +312,13 @@ void ExecuteMenu()
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_START_MINIMIZED, "Start minimized");
 	}
 
+	// -- Start minimized.
+	if (AppData::ShowUnreadMessages.Get()) {
+		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages");
+	} else {
+		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages");
+	}
+
 	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
 
 	AppendMenu(hMenu, MF_STRING, IDM_RESTORE, "Restore Window");
@@ -353,6 +360,10 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 		case IDM_SETTING_START_MINIMIZED:
 			// Toggle the 'start minimized'-feature.
 			AppData::StartMinimized.Set(!AppData::StartMinimized.Get());
+			break;
+		case IDM_SETTING_SHOW_UNREAD_MESSAGES:
+			// Toggle the 'ShowUnreadMessages'-feature.
+			AppData::ShowUnreadMessages.Set(!AppData::ShowUnreadMessages.Get());
 			break;
 		case IDM_RESTORE:
 			Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - IDM_RESTORE");
@@ -409,12 +420,16 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - QuitMessage posted.");
 		break;
 	case WM_WHATSAPP_API_NEW_MESSAGE:
-		
+
 		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_WHATSAPP_API_NEW_MESSAGE");
 		messagesSinceMinimize++;
-		char messagesSinceMinimizeBuffer[20] = { 0 };
-		snprintf(messagesSinceMinimizeBuffer, sizeof(messagesSinceMinimizeBuffer), "%d", messagesSinceMinimize);
-		trayManager->SetIcon(_hwndWhatsapp, messagesSinceMinimizeBuffer);
+
+		if (AppData::ShowUnreadMessages.Get()) {
+			char messagesSinceMinimizeBuffer[20] = { 0 };
+			snprintf(messagesSinceMinimizeBuffer, sizeof(messagesSinceMinimizeBuffer), "%d", messagesSinceMinimize);
+			trayManager->SetIcon(_hwndWhatsapp, messagesSinceMinimizeBuffer);
+		}
+		
 		break;
 	}
 
