@@ -314,9 +314,9 @@ void ExecuteMenu()
 
 	// -- Start minimized.
 	if (AppData::ShowUnreadMessages.Get()) {
-		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages");
+		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages (experimental)");
 	} else {
-		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages");
+		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages (experimental)");
 	}
 
 	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
