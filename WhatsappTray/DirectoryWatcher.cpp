@@ -71,7 +71,7 @@ void DirectoryWatcher::WatchDirectoryWorker(std::wstring directory)
 				DWORD dwAction;
 				CStringA strFilename;
 				changes.Pop(dwAction, strFilename);
-				Logger::Debug("%s %s", CReadDirectoryChanges::ActionToString(dwAction).c_str(), strFilename);
+				//Logger::Debug("%s %s", CReadDirectoryChanges::ActionToString(dwAction).c_str(), strFilename);
 
 				directoryChangedEvent(dwAction, Helper::Utf8ToWide(std::string(strFilename)));
 			}

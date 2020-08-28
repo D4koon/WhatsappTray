@@ -24,9 +24,10 @@
 
 #include "Helper.h"
 
-#include <windows.h>
 #include <iostream>
-#include <time.h>
+#include <sstream>
+#include <iomanip>
+#include <chrono>
 
 std::ofstream Logger::logFile;
 Loglevel Logger::loglevelToLog = Loglevel::LOG_ERROR;
@@ -55,13 +56,7 @@ void Logger::Setup()
 		return;
 	}
 
-	time_t now = time(0);
-	struct tm localTimeStruct;
-	int errorNr = localtime_s(&localTimeStruct, &now);
-
-	const int LOGNAME_SIZE = 50;
-	static char timeString[LOGNAME_SIZE];
-	strftime(timeString, LOGNAME_SIZE, "%Y-%m-%d_%H#%M#%S", &localTimeStruct);
+	auto timeString = Logger::GetTimeString("%Y-%m-%d_%H#%M#%S");
 
 	std::string logPath = Helper::GetApplicationDirectory() + "log\\";
 	std::string logFileName = std::string("Log_") + timeString + std::string(".txt");
@@ -189,6 +184,11 @@ void Logger::ProcessLog(const Loglevel loglevel, const char* logTextBuffer)
 	}
 
 	std::string logText = "";
+	// Append timestamp
+	auto timeString = Logger::GetTimeString("%H:%M:%S", true);
+	logText.append(timeString + " - ");
+
+	// Append loglevel
 	switch (loglevel) {
 	case Loglevel::LOG_APP: break;
 	case Loglevel::LOG_FATAL: logText = "FATAL: "; break;
@@ -212,4 +212,33 @@ void Logger::ProcessLog(const Loglevel loglevel, const char* logTextBuffer)
 
 	logFile << logText;
 	logFile.flush();
+}
+
+std::string Logger::GetTimeString(const char* formatString, bool withMilliseconds)
+{
+	using namespace std::chrono;
+
+	// Get current time
+	auto now = system_clock::now();
+
+	// Get number of milliseconds for the current second
+	// (remainder after division into seconds)
+	auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+
+	// Convert to std::time_t in order to convert to std::tm (broken time)
+	auto timer = system_clock::to_time_t(now);
+
+	// Convert to broken time
+	struct tm local_time;
+	localtime_s(&local_time, &timer);
+
+	std::ostringstream oss;
+
+	oss << std::put_time(&local_time, formatString);
+	if (withMilliseconds)
+	{
+		oss << '.' << std::setfill('0') << std::setw(3) << ms.count();
+	}
+	
+	return oss.str();
 }

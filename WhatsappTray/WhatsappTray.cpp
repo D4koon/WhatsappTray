@@ -58,17 +58,21 @@ static int messagesSinceMinimize = 0;
 static std::unique_ptr<TrayManager> trayManager;
 
 LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-HWND findWhatsapp();
-HWND startWhatsapp();
-bool createWindow();
-bool setHook();
-void setLaunchOnWindowsStartupSetting(bool value);
+HWND FindWhatsapp();
+HWND StartWhatsapp();
+void TryClosePreviousWhatsappTrayInstance();
+bool CreateWhatsappTrayWindow();
+bool SetHook();
+void SetLaunchOnWindowsStartupSetting(bool value);
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
 	_hInstance = hInstance;
 
 	Logger::Setup();
+
+	// For reading data from *.lnk files (shortcut files). See Helper::ResolveLnk()
+	CoInitialize(nullptr);
 
 	Logger::Info(MODULE_NAME "::WinMain() - Starting WhatsappTray %s in %s CompileConfiguration.", Helper::GetProductAndVersion().c_str(), CompileConfiguration);
 
@@ -81,20 +85,22 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
 	// Setup the settings for launch on windows startup.
-	setLaunchOnWindowsStartupSetting(AppData::LaunchOnWindowsStartup.Get());
+	SetLaunchOnWindowsStartupSetting(AppData::LaunchOnWindowsStartup.Get());
 
 	// Check if closeToTray was set per commandline. (this overrides the persistent storage-value.)
 	if (strstr(lpCmdLine, "--closeToTray")) {
 		AppData::CloseToTray.Set(true);
 	}
 
-	if (!(_hLib = LoadLibrary("Hook.dll"))) {
-		Logger::Error(MODULE_NAME "::WinMain() - Error loading Hook.dll.");
-		MessageBox(NULL, "Error loading Hook.dll.", "WhatsappTray", MB_OK | MB_ICONERROR);
+	/* If WhatsappTray window is already open close it */
+	TryClosePreviousWhatsappTrayInstance();
+
+	if (CreateWhatsappTrayWindow() == false) {
 		return 0;
 	}
 
-	if (startWhatsapp() == NULL) {
+	if (!_hwndWhatsappTray) {
+		MessageBox(NULL, "Error creating window", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return 0;
 	}
 
@@ -110,6 +116,181 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		});
 	}
 
+	if (!(_hLib = LoadLibrary("Hook.dll"))) {
+		Logger::Error(MODULE_NAME "::WinMain() - Error loading Hook.dll.");
+		MessageBox(NULL, "Error loading Hook.dll.", "WhatsappTray", MB_OK | MB_ICONERROR);
+		return 0;
+	}
+
+	if (StartWhatsapp() == nullptr) {
+		MessageBoxA(NULL, (std::string("Error launching WhatsApp. Examine the logs for details")).c_str(), "WhatsappTray", MB_OK);
+		return 0;
+	}
+
+	if (SetHook() == false) {
+		Logger::Error(MODULE_NAME "::WinMain() - Error setting hook.");
+		return 0;
+	}
+
+	trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
+	// Send a WM_WHATSAPP_API_NEW_MESSAGE-message when a new WhatsApp-message has arrived.
+	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_WHATSAPP_API_NEW_MESSAGE, 0, 0); });
+
+	MSG msg;
+	while (IsWindow(_hwndWhatsappTray) && GetMessage(&msg, _hwndWhatsappTray, 0, 0)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+
+	Gdiplus::GdiplusShutdown(gdiplusToken);
+	CoUninitialize();
+
+	return 0;
+}
+
+/**
+ * Start WhatsApp.
+ */
+HWND StartWhatsapp()
+{
+	fs::path waStartPath = Helper::Utf8ToWide(std::string(AppData::WhatsappStartpath.Get()));
+	std::string waStartPathString;
+	if (waStartPath.is_relative()) {
+		fs::path appPath = Helper::GetApplicationFilePath();
+		auto combinedPath = appPath / waStartPath;
+
+		Logger::Info(MODULE_NAME "StartWhatsapp() - Starting WhatsApp from combinedPath:%s", combinedPath.string().c_str());
+
+		// Shorten the path by converting to absoltue path.
+		auto combinedPathCanonical = fs::canonical(combinedPath);
+		waStartPathString = combinedPathCanonical.string();
+	} else {
+		waStartPathString = waStartPath.string();
+	}
+
+	Logger::Info(MODULE_NAME "::StartWhatsapp() - Starting WhatsApp from canonical-path:'" + waStartPathString + "'");
+
+	auto waStartPathStringExtension = waStartPathString.substr(waStartPathString.size() - 3);
+	if (waStartPathStringExtension.compare("lnk") == 0)
+	{
+		waStartPathString = Helper::ResolveLnk(_hwndWhatsappTray, waStartPathString.c_str());
+		Logger::Info(MODULE_NAME "::StartWhatsapp() - Resolved .lnk (Shortcut) to :'" + waStartPathString + "'");
+	}
+
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	// Add quotes so a path with spaces can be used
+	auto cmdLine = ("\"" + waStartPathString + "\"");
+
+	// Start the process. 
+	if (!CreateProcess(NULL,    // No module name (use command line)
+		(LPSTR)cmdLine.c_str(), // Command line
+		NULL,                   // Process handle not inheritable
+		NULL,                   // Thread handle not inheritable
+		FALSE,                  // Set handle inheritance to FALSE
+		0,                      // No creation flags
+		NULL,                   // Use parent's environment block
+		NULL,                   // Use parent's starting directory 
+		&si,                    // Pointer to STARTUPINFO structure
+		&pi)                    // Pointer to PROCESS_INFORMATION structure
+		)
+	{
+		Logger::Info(MODULE_NAME "::StartWhatsapp() - CreateProcess failed(%d).", GetLastError());
+		return nullptr;
+	}
+
+	// Wait a maximum of 2000ms for the process to go into idle.
+	auto result = WaitForInputIdle(pi.hProcess, 2000);
+	if (result != 0)
+	{
+		Logger::Info(MODULE_NAME "::StartWhatsapp() - WaitForInputIdle failed.");
+		return nullptr;
+	}
+
+	// We want to find the window-handle of WhatsApp
+	// - The hard thing here is to find the window-handle even if WhatsApp was already running when CreateProcess() was called.
+	//   This means we can not really rely on the data (STARTUPINFO and PROCESS_INFORMATION) from CreateProcess()
+	// - Normally the exe referenced by the shortcut spawns the real program(exe).
+	//   So it is necessary to find the child-process of the original process.
+
+	 // Wait for WhatsApp to be started.
+	Sleep(100);
+	for (int attemptN = 0; (_hwndWhatsapp = FindWhatsapp()) == NULL; ++attemptN) {
+		if (attemptN > 60) {
+			MessageBoxA(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
+			return nullptr;
+		}
+		Logger::Info(MODULE_NAME "StartWhatsapp() - WhatsApp-Window not found. Wait 500ms and retry.");
+		Sleep(500);
+	}
+
+	Logger::Info(MODULE_NAME "StartWhatsapp() - WhatsApp-Window found.");
+
+	return _hwndWhatsapp;
+}
+
+/**
+ * Search for the WhatsApp window.
+ * Checks if it is the correct window:
+ * 1. Get the path to the binary(exe) for the window with "WhatsApp" in the title
+ * 2. Match it with the appData-setting.
+ */
+HWND FindWhatsapp()
+{
+	HWND currentWindow = NULL;
+	while (true) {
+		currentWindow = FindWindowExA(NULL, currentWindow, NULL, WHATSAPP_CLIENT_NAME);
+		if (currentWindow == NULL) {
+			return NULL;
+		}
+
+		DWORD processId;
+		DWORD threadId = GetWindowThreadProcessId(currentWindow, &processId);
+
+		HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+		if (processHandle == NULL) {
+			Logger::Error(MODULE_NAME "::FindWhatsapp() - Failed to open process.");
+			continue;
+		}
+
+		wchar_t filepath[MAX_PATH];
+		if (GetModuleFileNameExW(processHandle, NULL, filepath, MAX_PATH) == 0) {
+			CloseHandle(processHandle);
+			Logger::Error(MODULE_NAME "::FindWhatsapp() - Failed to get module filepath.");
+			continue;
+		}
+		CloseHandle(processHandle);
+
+		Logger::Info(MODULE_NAME "::FindWhatsapp() - Filepath is: '%s'", Helper::WideToUtf8(filepath).c_str());
+
+		std::wstring filenameFromWindow = Helper::GetFilenameFromPath(filepath);
+		std::wstring whatsappStartpathWide = Helper::Utf8ToWide(AppData::WhatsappStartpath.Get());
+		std::wstring filenameFromSettings = Helper::GetFilenameFromPath(whatsappStartpathWide);
+
+		// NOTE: I do not compare the extension because when i start from an link, the name is WhatsApp.lnk whicht does not match the WhatsApp.exe
+		// This could be improved by reading the real value from the .lnk but i think this should be fine for now.
+		if (filenameFromWindow.compare(filenameFromSettings) != 0) {
+			Logger::Error(MODULE_NAME "::FindWhatsapp() - Filenames from window and from settings do not match.");
+			continue;
+		}
+
+		Logger::Info(MODULE_NAME "::FindWhatsapp() - Found match.");
+		break;
+	}
+
+	return currentWindow;
+}
+
+/**
+ * Try to close old WhatsappTray instance
+ */
+void TryClosePreviousWhatsappTrayInstance()
+{
 	// Test if WhatsappTray is already running.
 	// NOTE: This also matches the class-name of the window so we can be sure its our window and not for example an explorer-window with this name.
 	_hwndWhatsappTray = FindWindow(NAME, NAME);
@@ -126,134 +307,13 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 #pragma WARNING("It would be best to wait her a bit and check if it is still active. And if it is still active shoot it down.")
 	}
-
-	if (setHook() == false) {
-		return 0;
-	}
-
-	if (createWindow() == false) {
-		return 0;
-	}
-
-	if (!_hwndWhatsappTray) {
-		MessageBox(NULL, "Error creating window", "WhatsappTray", MB_OK | MB_ICONERROR);
-		return 0;
-	}
-	trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
-
-	// Send a WM_WHATSAPP_API_NEW_MESSAGE-message when a new WhatsApp-message has arrived.
-	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_WHATSAPP_API_NEW_MESSAGE, 0, 0); });
-
-	MSG msg;
-	while (IsWindow(_hwndWhatsappTray) && GetMessage(&msg, _hwndWhatsappTray, 0, 0)) {
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
-	}
-
-	Gdiplus::GdiplusShutdown(gdiplusToken);
-
-	return 0;
-}
-
-/**
- * Start WhatsApp.
- */
-HWND startWhatsapp()
-{
-	_hwndWhatsapp = findWhatsapp();
-
-	fs::path waStartPath = Helper::Utf8ToWide(std::string(AppData::WhatsappStartpath.Get()));
-	std::string waStartPathString;
-	if (waStartPath.is_relative()) {
-		fs::path appPath = Helper::GetApplicationFilePath();
-		auto combinedPath = appPath / waStartPath;
-
-		Logger::Info(MODULE_NAME "startWhatsapp() - Starting WhatsApp from combinedPath:%s", combinedPath.string().c_str());
-
-		// Shorten the path by converting to absoltue path.
-		auto combinedPathCanonical = fs::canonical(combinedPath);
-		waStartPathString = combinedPathCanonical.string();
-	} else {
-		waStartPathString = waStartPath.string();
-	}
-
-	Logger::Info(MODULE_NAME "::startWhatsapp() - Starting WhatsApp from canonical-path:'" + waStartPathString + "'");
-	HINSTANCE hInst = ShellExecuteA(0, NULL, waStartPathString.c_str(), NULL, NULL, SW_NORMAL);
-	if (hInst <= (HINSTANCE)32) {
-		MessageBoxA(NULL, (std::string("Error launching WhatsApp from path='") + waStartPathString + "'").c_str(), "WhatsappTray", MB_OK);
-		return NULL;
-	}
-
-	// Wait for WhatsApp to be started.
-	Sleep(100);
-	for (int attemptN = 0; (_hwndWhatsapp = findWhatsapp()) == NULL; ++attemptN) {
-		if (attemptN > 60) {
-			MessageBoxA(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
-			return NULL;
-		}
-		Sleep(500);
-	}
-
-	return _hwndWhatsapp;
-}
-
-/**
- * Search for the WhatsApp window.
- * Checks if it is the correct window:
- * 1. Get the path to the binary(exe) for the window with "WhatsApp" in the title
- * 2. Match it with the appData-setting.
- */
-HWND findWhatsapp()
-{
-	HWND currentWindow = NULL;
-	while (true) {
-		currentWindow = FindWindowExA(NULL, currentWindow, NULL, WHATSAPP_CLIENT_NAME);
-		if (currentWindow == NULL) {
-			return NULL;
-		}
-
-		DWORD processId;
-		DWORD threadId = GetWindowThreadProcessId(currentWindow, &processId);
-
-		HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
-		if (processHandle == NULL) {
-			Logger::Error(MODULE_NAME "::startWhatsapp() - Failed to open process.");
-			continue;
-		}
-
-		wchar_t filepath[MAX_PATH];
-		if (GetModuleFileNameExW(processHandle, NULL, filepath, MAX_PATH) == 0) {
-			CloseHandle(processHandle);
-			Logger::Error(MODULE_NAME "::startWhatsapp() - Failed to get module filepath.");
-			continue;
-		}
-		CloseHandle(processHandle);
-
-		Logger::Info(MODULE_NAME "::startWhatsapp() - Filepath is: '%s'", Helper::WideToUtf8(filepath).c_str());
-
-		std::wstring filenameFromWindow = Helper::GetFilenameFromPath(filepath);
-		std::wstring whatsappStartpathWide = Helper::Utf8ToWide(AppData::WhatsappStartpath.Get());
-		std::wstring filenameFromSettings = Helper::GetFilenameFromPath(whatsappStartpathWide);
-
-		// NOTE: I do not compare the extension because when i start from an link, the name is WhatsApp.lnk whicht does not match the WhatsApp.exe
-		// This could be improved by reading the real value from the .lnk but i think this should be fine for now.
-		if (filenameFromWindow.compare(filenameFromSettings) != 0) {
-			Logger::Error(MODULE_NAME "::startWhatsapp() - Filenames from window and from settings do not match.");
-			continue;
-		}
-
-		Logger::Info(MODULE_NAME "::startWhatsapp() - Found match.");
-		break;
-	}
-
-	return currentWindow;
 }
 
 /**
  * Create a window.
  * This window will be mainly used to receive messages.
  */
-bool createWindow()
+bool CreateWhatsappTrayWindow()
 {
 	WNDCLASS wc;
 	wc.style = 0;
@@ -355,7 +415,7 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 		}
 		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP:
 			// Toggle the 'launch on windows startup'-feature.
-			setLaunchOnWindowsStartupSetting(!AppData::LaunchOnWindowsStartup.Get());
+			SetLaunchOnWindowsStartupSetting(!AppData::LaunchOnWindowsStartup.Get());
 			break;
 		case IDM_SETTING_START_MINIMIZED:
 			// Toggle the 'start minimized'-feature.
@@ -379,8 +439,8 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 		break;
 	case WM_REAPPLY_HOOK:
 		UnRegisterHook();
-		_hwndWhatsapp = findWhatsapp();
-		setHook();
+		_hwndWhatsapp = FindWhatsapp();
+		SetHook();
 		break;
 	case WM_ADDTRAY:
 		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_ADDTRAY");
@@ -436,8 +496,10 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
-bool setHook()
+bool SetHook()
 {
+	Logger::Info(MODULE_NAME "::SetHook()");
+
 	// Damit nicht alle Prozesse gehookt werde, verwende ich jetzt die ThreadID des WhatsApp-Clients.
 	DWORD processId;
 	DWORD threadId = GetWindowThreadProcessId(_hwndWhatsapp, &processId);
@@ -456,7 +518,7 @@ bool setHook()
 /*
  * @brief Sets the 'launch on windows startup'-setting.
  */
-void setLaunchOnWindowsStartupSetting(bool value)
+void SetLaunchOnWindowsStartupSetting(bool value)
 {
 	AppData::LaunchOnWindowsStartup.Set(value);
 

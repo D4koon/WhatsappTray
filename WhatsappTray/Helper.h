@@ -44,5 +44,6 @@ public:
 	static std::string GetWindowsAppDataDirectory();
 	static std::string GetFilenameFromPath(std::string path);
 	static std::wstring GetFilenameFromPath(std::wstring path);
+	static std::string ResolveLnk(HWND hwnd, LPCSTR lpszLinkFile);
 };
 
