@@ -36,6 +36,7 @@ TrayManager::TrayManager(HWND _hwndWhatsappTray)
 	: _hwndWhatsappTray(_hwndWhatsappTray)
 	, _hwndItems { 0 }
 {
+	Logger::Info(MODULE_NAME "::ctor() - Creating TrayManger.");
 }
 
 void TrayManager::MinimizeWindowToTray(HWND hwnd)

@@ -46,6 +46,7 @@ private:
 	bool LogLine(Loglevel loglevel, std::string text, ...);
 	static bool LogVariadic(Loglevel loglevel, std::string text, va_list vadriaicList);
 	static void ProcessLog(const Loglevel loglevel, const char* logTextBuffer);
+	static std::string GetTimeString(const char* formatString, bool withMilliseconds = false);
 
 public:
 	static Loglevel loglevelToLog;
