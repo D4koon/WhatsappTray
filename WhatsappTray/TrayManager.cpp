@@ -36,7 +36,7 @@ TrayManager::TrayManager(HWND _hwndWhatsappTray)
 	: _hwndWhatsappTray(_hwndWhatsappTray)
 	, _hwndItems { 0 }
 {
-	Logger::Info(MODULE_NAME "::ctor() - Creating TrayManger.");
+	Logger::Info(MODULE_NAME "ctor() - Creating TrayManger.");
 }
 
 void TrayManager::MinimizeWindowToTray(HWND hwnd)
@@ -111,11 +111,13 @@ void TrayManager::CloseWindowFromTray(HWND hwnd)
 	Logger::Info(MODULE_NAME "CloseWindowFromTray()");
 
 	// Use PostMessage to avoid blocking if the program brings up a dialog on exit.
-	// Also, Explorer windows ignore WM_CLOSE messages from SendMessage.
-	PostMessage(hwnd, WM_CLOSE, 0, 0);
+	// NOTE: WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE is a special message i made because WM_CLOSE is always blocked by the hook
+	PostMessage(hwnd, WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE, 0, 0);
 
 	Sleep(50);
-	if (IsWindow(hwnd)) Sleep(50);
+	if (IsWindow(hwnd)) {
+		Sleep(50);
+	}
 
 	if (!IsWindow(hwnd)) {
 		// Closed successfully

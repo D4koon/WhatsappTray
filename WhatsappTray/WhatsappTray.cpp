@@ -470,6 +470,23 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 		// If Whatsapp is closing we want to close WhatsappTray as well.
 		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_WHAHTSAPP_CLOSING");
 		DestroyWindow(_hwndWhatsappTray);
+	case WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE:
+		Logger::Info(MODULE_NAME "::" + std::string(__func__) + "() - WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE received");
+		// This message means that WhatsApp received a WM_CLOSE-message.
+		// This happens when alt + f4 is pressed.
+
+		if (AppData::CloseToTray.Get()) {
+			// Close to tray is activated => Minimize Whatsapp to tray.
+			PostMessage(hwnd, WM_ADDTRAY, 0, 0);
+		}
+		else {
+			// Close to tray is not activated => Close Whatsapp.
+
+			// NOTE: WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE is a special message i made because WM_CLOSE is always blocked by the hook.
+			PostMessage(_hwndWhatsapp, WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE, 0, 0);
+			Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE sent");
+		}
+		
 		break;
 	case WM_DESTROY:
 		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_DESTROY");
