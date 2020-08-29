@@ -22,49 +22,170 @@
 #include "SharedDefines.h"
 #include "WindowsMessage.h"
 
+#include <windows.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 
+// Problems with OutputDebugString:
+// Had problems that the messages from OutputDebugString in the hook-functions did not work anymore after some playing arround with old versions, suddenly it worked again.
+// Maybe its best to restart pc and hope that it will be fixed, when this happens again...
+
+// NOTES:
+// It looks like as if the contrlos like _ and X for minimize or close are custom controls and do not trigger all normal messgages
+// For example SC_CLOSE seems to be not sent when clicking the X
+
+// Use DebugView (https://docs.microsoft.com/en-us/sysinternals/downloads/debugview) to see OutputDebugString() messages.
+
 #undef MODULE_NAME
-#define MODULE_NAME "[WhatsappTrayHook] "
+#define MODULE_NAME "WhatsappTrayHook::"
 
 static HHOOK _hWndProc = NULL;
 static HHOOK _mouseProc = NULL;
 static HHOOK _cbtProc = NULL;
 
-// Using this variable i am able to enable/disable tracing. I could do that by using a self defined windowmessage and send it to the application. (not implemented yet)
-#ifdef _DEBUG
-static bool traceActivated = true;
-#else
-static bool traceActivated = false;
-#endif
+static DWORD _processIdWhatsapp;
+static HWND _hwndWhatsapp;
+static WNDPROC _originalWndProc;
 
-void TraceString(std::string traceString)
+LRESULT APIENTRY EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM lParam);
+LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam);
+bool IsTopLevelWhatsApp(HWND hwnd);
+std::string GetWindowTitle(HWND hwnd);
+bool SendMessageToWhatsappTray(HWND hwnd, UINT message);
+void TraceString(std::string traceString);
+void TraceStream(std::ostringstream& traceBuffer);
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
-	if (traceActivated) {
-		OutputDebugStringA(traceString.c_str());
+	std::ostringstream traceBuffer;
+
+	switch (fdwReason)
+	{
+	case DLL_PROCESS_ATTACH:
+
+		OutputDebugString("Hook.dll ATTACHED!");
+
+		// Find the WhatsApp window-handle that we need to replace the window-proc
+		_processIdWhatsapp = GetCurrentProcessId();
+
+		traceBuffer << "_processIdWhatsapp: 0x" << std::uppercase << std::hex << _processIdWhatsapp;
+		TraceStream(traceBuffer);
+
+		EnumWindows(EnumWindowsCallback, NULL);
+
+		traceBuffer << "Attached in window '" << GetWindowTitle(_hwndWhatsapp) << "'" << "_hwndWhatsapp: 0x" << std::uppercase << std::hex << _hwndWhatsapp;
+		TraceStream(traceBuffer);
+
+		// Replace the original window-proc with our own. This is called subclassing.
+		// Our window-proc will call after the processing the original window-proc.
+		_originalWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtr(_hwndWhatsapp, GWLP_WNDPROC, (LONG_PTR)EditSubclassProc));
+		
+		break;
+	case DLL_PROCESS_DETACH:
+		OutputDebugString("Hook.dll DETACHED!");
+
+		// Remove our window-proc from the chain by setting the original window-proc.
+		SetWindowLongPtr(_hwndWhatsapp, GWLP_WNDPROC, (LONG_PTR)_originalWndProc);
+		break;
 	}
+	return TRUE;
 }
 
 /**
- * To verify that we found the correct window:
- * 1. Check if its a toplevel-window (below desktop)
- * 2. Match the window-name with whatsapp.
+ * @brief This is the new main window-proc. After we are done we call the original window-proc.
+ * 
+ * This method has the advantage over SetWindowsHookEx(WH_CALLWNDPROC... that here we can skip or modifie messages.
  */
-bool IsTopLevelWhatsApp(HWND hwnd)
+LRESULT APIENTRY EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	char windowNameBuffer[2000];
-	GetWindowTextA(hwnd, windowNameBuffer, sizeof(windowNameBuffer));
+	std::ostringstream traceBuffer;
 
-	if (hwnd != GetAncestor(hwnd, GA_ROOT)) {
-		TraceString(MODULE_NAME " - Window is not a toplevel-window.");
+#ifdef _DEBUG
+	if (uMsg != WM_GETTEXT) {
+		// Dont print WM_GETTEXT so there is not so much "spam"
+
+		traceBuffer << MODULE_NAME << __func__ << ": " << WindowsMessage::GetString(uMsg) << "(0x" << std::uppercase << std::hex << uMsg << ") ";
+		traceBuffer << "windowName='" << GetWindowTitle(hwnd) << "' ";
+		traceBuffer << "hwnd='" << std::uppercase << std::hex << hwnd << "' ";
+		traceBuffer << "wParam='" << std::uppercase << std::hex << wParam << "' ";
+		TraceStream(traceBuffer);
+	}
+#endif
+
+	if (uMsg == WM_SYSCOMMAND) {
+		// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
+		if (wParam == SC_MINIMIZE) {
+			TraceString(MODULE_NAME "SC_MINIMIZE");
+
+			// Here i check if the windowtitle matches. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
+			if (IsTopLevelWhatsApp(hwnd)) {
+				SendMessageToWhatsappTray(hwnd, WM_ADDTRAY);
+			}
+		}
+	} else if (uMsg == WM_NCDESTROY) {
+		uintptr_t handle1 = reinterpret_cast<uintptr_t>(hwnd);
+		uintptr_t whatsappTrayWindowHandle = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
+		traceBuffer << MODULE_NAME << __func__ << ": " << "WM_NCDESTROY whatsappTrayWindowHandle='" << whatsappTrayWindowHandle << "'";
+		TraceStream(traceBuffer);
+
+		if (IsTopLevelWhatsApp(hwnd)) {
+			auto successfulSent = SendMessageToWhatsappTray(hwnd, WM_WHAHTSAPP_CLOSING);
+			if (successfulSent) {
+				TraceString(MODULE_NAME "WM_WHAHTSAPP_CLOSING successful sent.");
+			}
+		}
+	} else if (uMsg == WM_CLOSE) {
+		// This happens when alt + f4 is pressed.
+		traceBuffer << MODULE_NAME << __func__ << ": WM_CLOSE received.";
+		TraceStream(traceBuffer);
+
+		// Notify WhatsappTray and if it wants to close it can do so...
+		SendMessageToWhatsappTray(hwnd, WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE);
+
+		traceBuffer << MODULE_NAME << __func__ << ": WM_CLOSE blocked.";
+		// Block WM_CLOSE
+		return 0;
+	} else if (uMsg == WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE) {
+		// This message is defined by me and should only come from WhatsappTray.
+		// It more or less replaces WM_CLOSE which is now always blocked...
+		// To have a way to still send WM_CLOSE this message was made.
+		traceBuffer << MODULE_NAME << __func__ << ": WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE received.";
+		TraceStream(traceBuffer);
+
+		traceBuffer << MODULE_NAME << __func__ << ": Send WM_CLOSE to WhatsApp.";
+		// NOTE: lParam/wParam are not used in WM_CLOSE.
+		return CallWindowProc(_originalWndProc, hwnd, WM_CLOSE, 0, 0);
+	}
+
+	// Call the original window-proc.
+	return CallWindowProc(_originalWndProc, hwnd, uMsg, wParam, lParam);
+}
+
+/**
+ * Search for the main whatsapp window
+ * 
+ * Be carefull, one process can have multiple windows.
+ * Thats why the window-title also gets checked.
+ */
+BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM lParam)
+{
+	DWORD processId;
+	auto result = GetWindowThreadProcessId(hwnd, &processId);
+
+	// Check processId and Title
+	// Already observerd an instance where the processId alone lead to an false match!
+	if (_processIdWhatsapp == processId && GetWindowTitle(hwnd).compare(WHATSAPP_CLIENT_NAME) == 0)
+	{
+		// Found the matching processId
+		_hwndWhatsapp = hwnd;
+
+		// Stop enumeration
 		return false;
 	}
-	if (strstr(windowNameBuffer, WHATSAPP_CLIENT_NAME) == false) {
-		TraceString(std::string(MODULE_NAME " - Window-name '") + windowNameBuffer + "' does not match '" WHATSAPP_CLIENT_NAME "'." + windowNameBuffer);
-		return false;
-	}
+
+	// Continue enumeration
 	return true;
 }
 
@@ -83,42 +204,13 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 	if (nCode < HC_ACTION) {
 		return CallNextHookEx(NULL, nCode, wParam, lParam);
 	}
-
-	CWPSTRUCT* msg = reinterpret_cast<CWPSTRUCT*>(lParam);
-
-	char buffer[2000];
-	//char windowNameBuffer[2000];
-	//GetWindowTextA(msg->hwnd, windowNameBuffer, sizeof(windowNameBuffer));
-	//sprintf_s(buffer, sizeof(buffer), MODULE_NAME "CallWndRetProc windowNameBuffer='%s' msg->hwnd='0x%lX' message=%s(0x%lX) wParam=0x%llX", windowNameBuffer, GetAncestor(msg->hwnd, GA_ROOT), WindowsMessage::GetString(msg->message).c_str(), msg->message, msg->wParam);
-	//TraceString(buffer);
-
-	if (msg->message == WM_SYSCOMMAND) {
-		// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
-		if (msg->wParam == SC_MINIMIZE) {
-			TraceString(MODULE_NAME "SC_MINIMIZE");
-
-			// Here i check if the windowtitle matches. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
-			if (IsTopLevelWhatsApp(msg->hwnd)) {
-				PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, reinterpret_cast<LPARAM>(msg->hwnd));
-			}
-		}
-	} else if (msg->message == WM_NCDESTROY) {
-		uintptr_t handle1 = reinterpret_cast<uintptr_t>(msg->hwnd);
-		uintptr_t whatsappTrayWindowHandle = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
-		sprintf_s(buffer, sizeof(buffer), MODULE_NAME "WM_NCDESTROY hwnd=0x%llX whatsappTrayWindowHandle=0x%llX", handle1, whatsappTrayWindowHandle);
-		TraceString(buffer);
-
-		if (IsTopLevelWhatsApp(msg->hwnd)) {
-			bool successfulSent = PostMessage(FindWindow(NAME, NAME), WM_WHAHTSAPP_CLOSING, 0, reinterpret_cast<LPARAM>(msg->hwnd));
-			if (successfulSent) {
-				TraceString(MODULE_NAME "WM_WHAHTSAPP_CLOSING successful sent.");
-			}
-		}
-	}
+	//CWPSTRUCT* msg = reinterpret_cast<CWPSTRUCT*>(lParam);
 
 	return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
+// This function is should not be active in normal distribution-version
+// Only for debugging. The call to SetWindowsHookEx(WH_CALLWNDPROC, ... to use this function instead of the "normal" one.
 LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam)
 {
 	//if (nCode >= 0)
@@ -127,8 +219,9 @@ LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam)
 
 		//if (msg->hwnd == (HWND)0x00120A42)
 		if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
-			//
+
 			if (msg->message == 0x2 || msg->message == 528 || msg->message == 70 || msg->message == 71 || msg->message == 28 || msg->message == 134 || msg->message == 6 || msg->message == 641 || msg->message == 642 || msg->message == 7 || msg->message == 533 || msg->message == 144 || msg->message == 70 || msg->message == 71 || msg->message == 134 || msg->message == 6 || msg->message == 28 || msg->message == 8 || msg->message == 641 || msg->message == 642 || msg->message == 626 || msg->message == 2) {
+				
 				// WM_DESTROY
 
 				//std::ostringstream filename2;
@@ -225,6 +318,62 @@ LRESULT CALLBACK MouseProc(_In_ int nCode, _In_ WPARAM wParam, _In_ LPARAM lPara
 	}
 
 	return CallNextHookEx(_cbtProc, nCode, wParam, lParam);
+}
+
+/**
+ * To verify that we found the correct window:
+ * 1. Check if its a toplevel-window (below desktop)
+ * 2. Match the window-name with whatsapp.
+ */
+bool IsTopLevelWhatsApp(HWND hwnd)
+{
+	if (hwnd != GetAncestor(hwnd, GA_ROOT)) {
+		TraceString(MODULE_NAME "IsTopLevelWhatsApp: Window is not a toplevel-window.");
+		return false;
+	}
+
+	auto windowName = GetWindowTitle(hwnd);
+	if (windowName.compare(WHATSAPP_CLIENT_NAME) != 0) {
+		TraceString(std::string(MODULE_NAME "IsTopLevelWhatsApp: windowName='") + windowName + "' does not match '" WHATSAPP_CLIENT_NAME "'." + windowName);
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * Gets the text of a window.
+ */
+std::string GetWindowTitle(HWND hwnd)
+{
+	char windowNameBuffer[2000];
+	GetWindowTextA(hwnd, windowNameBuffer, sizeof(windowNameBuffer));
+
+	return std::string(windowNameBuffer);
+}
+
+/**
+ * Send message to WhatsappTray.
+ */
+bool SendMessageToWhatsappTray(HWND hwnd, UINT message)
+{
+	return PostMessage(FindWindow(NAME, NAME), message, 0, reinterpret_cast<LPARAM>(hwnd));
+}
+
+void TraceString(std::string traceString)
+{
+#ifdef _DEBUG
+	OutputDebugStringA(traceString.c_str());
+#endif
+}
+
+void TraceStream(std::ostringstream& traceBuffer)
+{
+#ifdef _DEBUG
+	OutputDebugStringA(traceBuffer.str().c_str());
+	traceBuffer.clear();
+	traceBuffer.str(std::string());
+#endif
 }
 
 /**
