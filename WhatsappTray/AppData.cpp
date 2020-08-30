@@ -38,7 +38,7 @@ DataEntryS<SBool> AppData::CloseToTray(Data::CLOSE_TO_TRAY, false, &AppData::Set
 DataEntryS<SBool> AppData::LaunchOnWindowsStartup(Data::LAUNCH_ON_WINDOWS_STARTUP, false, &AppData::SetData);
 DataEntryS<SBool> AppData::StartMinimized(Data::START_MINIMIZED, false, &AppData::SetData);
 DataEntryS<SBool> AppData::ShowUnreadMessages(Data::SHOW_UNREAD_MESSAGES, false, &AppData::SetData);
-DataEntryS<SString> AppData::WhatsappStartpath(Data::WHATSAPP_STARTPATH, Helper::GetStartMenuProgramsDirectory() + "\\WhatsApp\\WhatsApp.lnk", &AppData::SetData);
+DataEntryS<SString> AppData::WhatsappStartpath(Data::WHATSAPP_STARTPATH, std::string("%userStartmenuePrograms%\\WhatsApp\\WhatsApp.lnk"), &AppData::SetData);
 DataEntryS<SString> AppData::WhatsappRoamingDirectory(Data::WHATSAPP_ROAMING_DIRECTORY, Helper::GetWindowsAppDataDirectory(), &AppData::SetData);
 
 /// Initialize the dummy-value initDone with a lambda to get a static-constructor like behavior. NOTE: The disadvantage is though that we can not control the order. For example if we want to make sure that the logger inits first.
@@ -56,10 +56,10 @@ bool AppData::initDone([]()
 	return true; 
 }());
 
-/*
-* Set the data in the persistant storage.
-* Write data to the AppData-file.
-*/
+/**
+ * @brief Set the data in the persistant storage.
+ * Write data to the AppData-file.
+ */
 bool AppData::SetData(DataEntry& value)
 {
 	std::string appDataFilePath = GetAppDataFilePath();
@@ -75,7 +75,7 @@ bool AppData::SetData(DataEntry& value)
 }
 
 /**
- * Returns the default value if no value is found.
+ * @brief Returns the default value if no value is found.
  */
 std::string AppData::GetDataOrSetDefault(DataEntry& value)
 {
@@ -98,7 +98,7 @@ std::string AppData::GetDataOrSetDefault(DataEntry& value)
 }
 
 /**
- * Get path to the data-file.
+ * @brief Get path to the data-file.
  */
 std::string AppData::GetAppDataFilePath()
 {
@@ -125,4 +125,17 @@ std::string AppData::GetAppDataFilePath()
 	appDataFilePath.append("appData.ini");
 
 	return appDataFilePath;
+}
+
+/**
+ * @brief Gets the path to the shortcut(*.lnk) or *.exe file of WhatsApp
+ */
+std::string AppData::WhatsappStartpathGet()
+{
+	auto path = AppData::WhatsappStartpath.Get().ToString();
+
+	Helper::Replace(path, "%userStartmenuePrograms%", Helper::GetStartMenuProgramsDirectory());
+	Helper::Replace(path, "%userprofile%", Helper::GetCurrentUserDirectoryDirectory());
+
+	return path;
 }

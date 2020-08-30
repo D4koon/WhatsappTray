@@ -127,6 +127,17 @@ std::string Helper::WideToUtf8(const std::wstring& inputString)
 	return strTo;
 }
 
+bool Helper::Replace(std::string& str, const std::string& oldValue, const std::string& newValue) {
+	size_t start_pos = str.find(oldValue);
+	if (start_pos == std::string::npos) {
+		return false;
+	}
+
+	str.replace(start_pos, oldValue.length(), newValue);
+
+	return true;
+}
+
 HICON Helper::GetWindowIcon(HWND hwnd)
 {
 	HICON icon;
@@ -201,6 +212,17 @@ std::string Helper::GetWindowsAppDataDirectory()
 		return "";
 	}
 	return appDataDirectory;
+}
+
+std::string Helper::GetCurrentUserDirectoryDirectory()
+{
+	char currentUserDirectory[MAX_PATH] = { 0 };
+	if (SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, SHGFP_TYPE_CURRENT, currentUserDirectory) != S_OK) {
+		Logger::Fatal(MODULE_NAME "Init() - Could not get the CurrentUser-directory!");
+		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the CurrentUser-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		return "";
+	}
+	return currentUserDirectory;
 }
 
 std::string Helper::GetFilenameFromPath(std::string path)

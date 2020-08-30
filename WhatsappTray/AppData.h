@@ -146,11 +146,14 @@ public:
 	static DataEntryS<SBool> StartMinimized;
 	static DataEntryS<SBool> ShowUnreadMessages;
 	// NOTE: UTF8-string.
-	static DataEntryS<SString> WhatsappStartpath;
-	// NOTE: UTF8-string.
 	static DataEntryS<SString> WhatsappRoamingDirectory;
+
+	static std::string WhatsappStartpathGet();
 private:
 	AppData() {}
+
+	// NOTE: UTF8-string.
+	static DataEntryS<SString> WhatsappStartpath;
 
 	static std::string GetAppDataFilePath();
 	
