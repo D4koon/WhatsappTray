@@ -42,6 +42,7 @@ public:
 	void RefreshWindowInTray(HWND hwnd);
 	void SetIcon(HWND hwnd, LPCSTR text);
 	HWND GetHwndFromIndex(uintptr_t index);
+	void AddWindowToTray(HWND hwnd);
 private:
 	static const int MAXTRAYITEMS = 64;
 
@@ -49,7 +50,6 @@ private:
 	HWND _hwndWhatsappTray;
 	HWND _hwndItems[MAXTRAYITEMS];
 
-	void AddWindowToTray(HWND hwnd);
 	void CreateTrayIcon(int32_t index, HWND hwnd);
 	int32_t GetIndexFromWindowHandle(HWND hwnd);
 	HICON AddTextToIcon(HICON hBackgroundIcon, LPCSTR text);

@@ -8,9 +8,10 @@
 #define MAJOR 1
 #define MINOR 5
 #define PATCH 0
+#define _DEBUG
 
 #ifdef _DEBUG
-#define IS_DEBUG 1
+#define IS_DEBUG 4
 #else
 #define IS_DEBUG 0
 #endif
