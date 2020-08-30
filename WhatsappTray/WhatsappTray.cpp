@@ -155,7 +155,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
  */
 HWND StartWhatsapp()
 {
-	fs::path waStartPath = Helper::Utf8ToWide(std::string(AppData::WhatsappStartpath.Get()));
+	fs::path waStartPath = Helper::Utf8ToWide(AppData::WhatsappStartpathGet());
 	std::string waStartPathString;
 	if (waStartPath.is_relative()) {
 		fs::path appPath = Helper::GetApplicationFilePath();
@@ -271,7 +271,7 @@ HWND FindWhatsapp()
 		Logger::Info(MODULE_NAME "::FindWhatsapp() - Filepath is: '%s'", Helper::WideToUtf8(filepath).c_str());
 
 		std::wstring filenameFromWindow = Helper::GetFilenameFromPath(filepath);
-		std::wstring whatsappStartpathWide = Helper::Utf8ToWide(AppData::WhatsappStartpath.Get());
+		std::wstring whatsappStartpathWide = Helper::Utf8ToWide(AppData::WhatsappStartpathGet());
 		std::wstring filenameFromSettings = Helper::GetFilenameFromPath(whatsappStartpathWide);
 
 		// NOTE: I do not compare the extension because when i start from an link, the name is WhatsApp.lnk whicht does not match the WhatsApp.exe
