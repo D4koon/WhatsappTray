@@ -52,8 +52,6 @@ void TrayManager::MinimizeWindowToTray(HWND hwnd)
 		hwnd = GetAncestor(hwnd, GA_ROOT);
 	}
 
-	AddWindowToTray(hwnd);
-
 	// Hide window
 	// NOTE: The SW_MINIMIZE is important for the case when close-to-tray-feature is used:
 	// Without it, a maximized window is not restored as maximized.
@@ -164,7 +162,6 @@ void TrayManager::RestoreWindowFromTray(HWND hwnd)
 {
 	ShowWindow(hwnd, SW_RESTORE);
 	SetForegroundWindow(hwnd);
-	RemoveTrayIcon(hwnd);
 }
 
 void TrayManager::RefreshWindowInTray(HWND hwnd)

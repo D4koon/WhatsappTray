@@ -133,6 +133,8 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	}
 
 	trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
+	trayManager->AddWindowToTray(_hwndWhatsapp);
+
 	// Send a WM_WHATSAPP_API_NEW_MESSAGE-message when a new WhatsApp-message has arrived.
 	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_WHATSAPP_API_NEW_MESSAGE, 0, 0); });
 
@@ -473,6 +475,7 @@ LRESULT CALLBACK WhatsAppTrayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 		Logger::Info(MODULE_NAME "::WhatsAppTrayWndProc() - WM_DESTROY");
 
 		trayManager->RestoreAllWindowsFromTray();
+		trayManager->RemoveTrayIcon(_hwndWhatsapp);
 
 		UnRegisterHook();
 		FreeLibrary(_hLib);
