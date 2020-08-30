@@ -43,7 +43,8 @@ public:
 	static std::string GetProductAndVersion();
 	static std::string GetStartMenuProgramsDirectory();
 	static std::string GetWindowsAppDataDirectory();
-	static std::string GetCurrentUserDirectoryDirectory();
+	static std::string GetCurrentUserDirectory();
+	static std::string GetCurrentUserAppData();
 	static std::string GetFilenameFromPath(std::string path);
 	static std::wstring GetFilenameFromPath(std::wstring path);
 	static std::string ResolveLnk(HWND hwnd, LPCSTR lpszLinkFile);

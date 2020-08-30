@@ -47,7 +47,7 @@ std::function<void()> WhatsAppApi::receivedFullInitEvent = NULL;
 /// Initialize the class.
 void WhatsAppApi::Init()
 {
-	std::wstring leveldbDirectory = Helper::Utf8ToWide(std::string(AppData::WhatsappRoamingDirectory.Get()));
+	std::wstring leveldbDirectory = Helper::Utf8ToWide(std::string(AppData::WhatsappRoamingDirectoryGet()));
 
 	// Add a slash to the end of the path if ther is none.
 	auto lastCharacter = leveldbDirectory[leveldbDirectory.length() - 1];

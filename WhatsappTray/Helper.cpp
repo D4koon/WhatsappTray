@@ -214,10 +214,24 @@ std::string Helper::GetWindowsAppDataDirectory()
 	return appDataDirectory;
 }
 
-std::string Helper::GetCurrentUserDirectoryDirectory()
+std::string Helper::GetCurrentUserDirectory()
 {
 	char currentUserDirectory[MAX_PATH] = { 0 };
 	if (SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, SHGFP_TYPE_CURRENT, currentUserDirectory) != S_OK) {
+		Logger::Fatal(MODULE_NAME "Init() - Could not get the CurrentUser-directory!");
+		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the CurrentUser-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		return "";
+	}
+	return currentUserDirectory;
+}
+
+/**
+ * @brief Gets the path to C:\Users\<JohnDoe>\AppData\Roaming
+*/
+std::string Helper::GetCurrentUserAppData()
+{
+	char currentUserDirectory[MAX_PATH] = { 0 };
+	if (SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, currentUserDirectory) != S_OK) {
 		Logger::Fatal(MODULE_NAME "Init() - Could not get the CurrentUser-directory!");
 		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the CurrentUser-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 		return "";
