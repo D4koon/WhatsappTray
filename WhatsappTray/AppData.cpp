@@ -135,7 +135,9 @@ std::string AppData::WhatsappStartpathGet()
 	auto path = AppData::WhatsappStartpath.Get().ToString();
 
 	Helper::Replace(path, "%userStartmenuePrograms%", Helper::GetStartMenuProgramsDirectory());
+	Helper::Replace(path, "%UserProfile%", Helper::GetCurrentUserDirectory());
 	Helper::Replace(path, "%userprofile%", Helper::GetCurrentUserDirectory());
+	Helper::Replace(path, "%AppData%", Helper::GetCurrentUserAppData());
 	Helper::Replace(path, "%appdata%", Helper::GetCurrentUserAppData());
 
 	return path;
@@ -148,7 +150,9 @@ std::string AppData::WhatsappRoamingDirectoryGet()
 {
 	auto path = AppData::WhatsappRoamingDirectory.Get().ToString();
 
+	Helper::Replace(path, "%UserProfile%", Helper::GetCurrentUserDirectory());
 	Helper::Replace(path, "%userprofile%", Helper::GetCurrentUserDirectory());
+	Helper::Replace(path, "%AppData%", Helper::GetCurrentUserAppData());
 	Helper::Replace(path, "%appdata%", Helper::GetCurrentUserAppData());
 
 	return path;
