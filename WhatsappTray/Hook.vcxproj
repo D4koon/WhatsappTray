@@ -108,10 +108,12 @@
     </BuildLog>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="WinSockClient.cpp" />
     <ClCompile Include="Hook.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SharedDefines.h" />
+    <ClInclude Include="WinSockClient.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

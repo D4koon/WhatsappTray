@@ -137,6 +137,7 @@
     <ClCompile Include="TrayManager.cpp" />
     <ClCompile Include="WhatsAppApi.cpp" />
     <ClCompile Include="WhatsappTray.cpp" />
+    <ClCompile Include="WinSockServer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AboutDialog.h" />
@@ -155,6 +156,7 @@
     <ClInclude Include="WhatsappTray.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="WindowsMessage.h" />
+    <ClInclude Include="WinSockServer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Version.rc2" />
@@ -162,11 +164,6 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="WhatsappTray.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="Hook.vcxproj">
-      <Project>{9cd8044a-759a-4f65-b9fe-6dd8dd188428}</Project>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

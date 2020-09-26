@@ -27,6 +27,7 @@
 #include <vector>
 #include <sstream>
 #include <Shlobj.h>
+#include <psapi.h>
 
 /* For .lnk resolver */
 #include "shobjidl.h"
@@ -339,4 +340,29 @@ std::string Helper::ResolveLnk(HWND hwnd, LPCSTR lpszLinkFile)
 	}
 
 	return lnkPath;
+}
+
+/**
+ * @brief Get the path to the executable for the ProcessID
+ *
+ * @param processId The ProcessID from which the path to the executable should be fetched
+ * @return The path to the executable from the ProcessID
+*/
+std::string Helper::GetFilepathFromProcessID(DWORD processId)
+{
+	HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+	if (processHandle == NULL) {
+		Logger::Error(MODULE_NAME "::GetFilepathFromProcessID() - Failed to open process.");
+		return "";
+	}
+
+	wchar_t filepath[MAX_PATH];
+	if (GetModuleFileNameExW(processHandle, NULL, filepath, MAX_PATH) == 0) {
+		CloseHandle(processHandle);
+		Logger::Error(MODULE_NAME "::GetFilepathFromProcessID() - Failed to get module filepath.");
+		return "";
+	}
+	CloseHandle(processHandle);
+
+	return Helper::WideToUtf8(filepath);
 }

@@ -74,6 +74,9 @@
     <ClInclude Include="WindowsMessage.h">
       <Filter>Files\Helper</Filter>
     </ClInclude>
+    <ClInclude Include="WinSockServer.h">
+      <Filter>Files\Logging</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Registry.cpp">
@@ -111,6 +114,9 @@
     </ClCompile>
     <ClCompile Include="AppData.cpp">
       <Filter>Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WinSockServer.cpp">
+      <Filter>Files\Logging</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

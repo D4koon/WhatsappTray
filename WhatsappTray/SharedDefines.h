@@ -23,6 +23,13 @@
 
 #define NAME TEXT("WhatsappTray")
 #define WHATSAPP_CLIENT_NAME TEXT("WhatsApp")
+#define WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR "WhatsappTrayLoadLibraryTest" /* The enviroment-variable used to test if the hook.dll was triggerd by WhatsappTray's LoadLibrary() */
+#define WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE "TRUE" /* The value of the enviroment-variable used to test if the hook.dll was triggerd by WhatsappTray's LoadLibrary() */
+
+#define LOGGER_IP "127.0.0.1"
+// What port to use: https://stackoverflow.com/a/53667220/4870255
+// Ports 49152 - 65535 - Free to use these in client programs
+#define LOGGER_PORT "52677"
 
 #define WM_ADDTRAY  0x0401
 #define WM_TRAYCMD  0x0404
@@ -39,9 +46,21 @@
 #define IDM_SETTING_START_MINIMIZED   0x1007
 #define IDM_SETTING_SHOW_UNREAD_MESSAGES   0x1008
 
-#define DLLIMPORT __declspec(dllexport)
+#include <memory>
+#include <string>
+#include <stdexcept>
 
-#include <windows.h>
-
-BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray);
-void DLLIMPORT UnRegisterHook();
+/**
+ * @brief 
+ * 
+ * https://stackoverflow.com/a/26221725/4870255
+ */
+template<typename ... Args>
+std::string string_format(const std::string& format, Args ... args)
+{
+    size_t size = snprintf(nullptr, 0, format.c_str(), args ...) + 1; // Extra space for '\0'
+    if (size <= 0) { throw std::runtime_error("Error during formatting."); }
+    std::unique_ptr<char[]> buf(new char[size]);
+    snprintf(buf.get(), size, format.c_str(), args ...);
+    return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
+}

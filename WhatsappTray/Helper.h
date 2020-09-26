@@ -24,6 +24,7 @@
 // Include lib for GetFileVersionInfoSize()
 #pragma comment(lib,"Version.lib")
 
+#include <windows.h>
 #include <string>
 
 class Helper
@@ -48,5 +49,6 @@ public:
 	static std::string GetFilenameFromPath(std::string path);
 	static std::wstring GetFilenameFromPath(std::wstring path);
 	static std::string ResolveLnk(HWND hwnd, LPCSTR lpszLinkFile);
+	static std::string GetFilepathFromProcessID(DWORD processId);
 };
 

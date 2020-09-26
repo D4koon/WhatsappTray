@@ -1,19 +1,25 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Header Files">
+    <Filter Include="Files">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Hook.cpp">
-      <Filter>Header Files</Filter>
+      <Filter>Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WinSockClient.cpp">
+      <Filter>Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SharedDefines.h">
-      <Filter>Header Files</Filter>
+      <Filter>Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WinSockClient.h">
+      <Filter>Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

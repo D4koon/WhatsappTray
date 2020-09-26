@@ -28,6 +28,7 @@ class DirectoryWatcher;
 class WhatsAppApi
 {
 public:
+	static bool IsFullInit;
 	static void WhatsAppApi::NotifyOnNewMessage(const std::function<void()>& newMessageHandler);
 	static void WhatsAppApi::NotifyOnFullInit(const std::function<void()>& newMessageHandler);
 	static void Init();
@@ -35,8 +36,8 @@ private:
 	WhatsAppApi() { }
 	~WhatsAppApi() { }
 	static std::unique_ptr<DirectoryWatcher> dirWatcher;
-	static void IndexedDbChanged(const DWORD dwAction, std::wstring strFilename);
 	static std::function<void()> receivedMessageEvent;
 	static std::function<void()> receivedFullInitEvent;
+	static void IndexedDbChanged(const DWORD dwAction, std::wstring strFilename);
 };
 

@@ -39,12 +39,18 @@ namespace fs = std::experimental::filesystem;
 #undef MODULE_NAME
 #define MODULE_NAME "WhatsAppApi::"
 
+/* Public */
+bool WhatsAppApi::IsFullInit = false;
+
+/* Private */
 std::unique_ptr<DirectoryWatcher> WhatsAppApi::dirWatcher = std::unique_ptr<DirectoryWatcher>(nullptr);
 
 std::function<void()> WhatsAppApi::receivedMessageEvent = NULL;
 std::function<void()> WhatsAppApi::receivedFullInitEvent = NULL;
 
-/// Initialize the class.
+/**
+ * @brief Initialize the class.
+*/
 void WhatsAppApi::Init()
 {
 	std::wstring leveldbDirectory = Helper::Utf8ToWide(std::string(AppData::WhatsappRoamingDirectoryGet()));
@@ -167,6 +173,7 @@ void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::wstring strFilenam
 		if (std::regex_search(lineBuffer.c_str(), std::regex("models:mute:cache"))) {
 			Logger::Debug(MODULE_NAME "IndexedDbChanged() - Found match for fullInit.");
 
+			IsFullInit = true;
 			if (receivedFullInitEvent) {
 				receivedFullInitEvent();
 			}
@@ -180,9 +187,9 @@ void WhatsAppApi::IndexedDbChanged(const DWORD dwAction, std::wstring strFilenam
 
 		// Match: recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\ttimestampN
 		if (std::regex_search(lineBuffer.c_str(), std::regex("recv: [0-9a-f]{16}[.]--[0-9a-f]+\"\\ttimestampN"))) {
-			Logger::Info(MODULE_NAME "IndexedDbChanged() - Found match for receivedMessage.");
-
-			if (receivedMessageEvent) {
+			//Logger::Info(MODULE_NAME "IndexedDbChanged() - Found match for receivedMessage.");
+			
+			if (WhatsAppApi::IsFullInit && receivedMessageEvent) {
 				receivedMessageEvent();
 			}
 		}

@@ -21,11 +21,13 @@
 
 #include "SharedDefines.h"
 #include "WindowsMessage.h"
+#include "WinSockClient.h"
 
 #include <windows.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <psapi.h> // OpenProcess()
 
 // Problems with OutputDebugString:
 // Had problems that the messages from OutputDebugString in the hook-functions did not work anymore after some playing arround with old versions, suddenly it worked again.
@@ -40,57 +42,91 @@
 #undef MODULE_NAME
 #define MODULE_NAME "WhatsappTrayHook::"
 
-static HHOOK _hWndProc = NULL;
-static HHOOK _mouseProc = NULL;
-static HHOOK _cbtProc = NULL;
+#define DLLIMPORT __declspec(dllexport)
 
-static DWORD _processIdWhatsapp;
-static HWND _hwndWhatsapp;
-static WNDPROC _originalWndProc;
+static DWORD _processID = NULL;
+static HWND _whatsAppWindowHandle = NULL;
+static WNDPROC _originalWndProc = NULL;
 
-LRESULT APIENTRY EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM lParam);
-LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam);
-bool IsTopLevelWhatsApp(HWND hwnd);
-std::string GetWindowTitle(HWND hwnd);
-bool SendMessageToWhatsappTray(HWND hwnd, UINT message);
-void TraceString(std::string traceString);
-void TraceStream(std::ostringstream& traceBuffer);
+static HWND _tempWindowHandle = NULL; /* For GetTopLevelWindowhandleWithName() */
+static std::string _searchedWindowTitle; /* For GetTopLevelWindowhandleWithName() */
+
+static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+// NOTE: extern "C" is important to disable name-mangling, so that the functions can be found with GetProcAddress(), which is used in WhatsappTray.cpp
+extern "C" DLLIMPORT LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam);
+extern "C" DLLIMPORT LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam);
+static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle);
+static BOOL CALLBACK FindTopLevelWindowhandleWithNameCallback(HWND hwnd, LPARAM lParam);
+static bool WindowhandleIsToplevelWithTitle(HWND hwnd, std::string searchedWindowTitle);
+static bool IsTopLevelWhatsApp(HWND hwnd);
+static std::string GetWindowTitle(HWND hwnd);
+static std::string GetFilepathFromProcessID(DWORD processId);
+static std::string WideToUtf8(const std::wstring& inputString);
+static std::string GetEnviromentVariable(const std::string& inputString);
+static bool SendMessageToWhatsappTray(HWND hwnd, UINT message);
+static void TraceString(std::string traceString);
+static void TraceStream(std::ostringstream& traceBuffer);
+
+#define LogString(logString, ...) TraceString(string_format(logString, __VA_ARGS__))
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
-	std::ostringstream traceBuffer;
-
 	switch (fdwReason)
 	{
-	case DLL_PROCESS_ATTACH:
-
-		OutputDebugString("Hook.dll ATTACHED!");
+	case DLL_PROCESS_ATTACH: {
+		SocketInit();
 
 		// Find the WhatsApp window-handle that we need to replace the window-proc
-		_processIdWhatsapp = GetCurrentProcessId();
+		_processID = GetCurrentProcessId();
 
-		traceBuffer << "_processIdWhatsapp: 0x" << std::uppercase << std::hex << _processIdWhatsapp;
-		TraceStream(traceBuffer);
+		LogString("Attached hook.dll to ProcessID: 0x%08X", _processID);
 
-		EnumWindows(EnumWindowsCallback, NULL);
+		auto filepath = GetFilepathFromProcessID(_processID);
 
-		traceBuffer << "Attached in window '" << GetWindowTitle(_hwndWhatsapp) << "'" << "_hwndWhatsapp: 0x" << std::uppercase << std::hex << _hwndWhatsapp;
-		TraceStream(traceBuffer);
+		/* LoadLibrary()triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
+		 * to prevent tirggering the wndProc redirect for WhatsappTray we need to detect if this happend.
+		 * the easiest/best way to detect that is by setting a enviroment variable before LoadLibrary() */
+		auto envValue = GetEnviromentVariable(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR);
+
+		LogString("Filepath: '%s' " WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR ": '%s'", filepath.c_str(), envValue.c_str());
+
+		if (envValue.compare(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE) == 0) {
+			LogString("Detected that this Attache was triggered by LoadLibrary() => Cancel further processing");
+
+			// It is best to remove the variable here so we can be sure it is not removed before it was detected.
+			// Delete enviroment-variable by setting it to "".
+			_putenv_s(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR, "");
+			break;
+		}
+
+		_whatsAppWindowHandle = GetTopLevelWindowhandleWithName(WHATSAPP_CLIENT_NAME);
+		auto windowTitle = GetWindowTitle(_whatsAppWindowHandle);
+
+		LogString("Attached in window '%s' _whatsAppWindowHandle: 0x%08X", windowTitle.c_str(), _whatsAppWindowHandle);
+
+		if (_whatsAppWindowHandle == NULL) {
+			LogString("Error, window-handle for '" WHATSAPP_CLIENT_NAME "' was not found");
+		}
 
 		// Replace the original window-proc with our own. This is called subclassing.
 		// Our window-proc will call after the processing the original window-proc.
-		_originalWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtr(_hwndWhatsapp, GWLP_WNDPROC, (LONG_PTR)EditSubclassProc));
-		
-		break;
-	case DLL_PROCESS_DETACH:
-		OutputDebugString("Hook.dll DETACHED!");
+		_originalWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtr(_whatsAppWindowHandle, GWLP_WNDPROC, (LONG_PTR)RedirectedWndProc));
 
-		// Remove our window-proc from the chain by setting the original window-proc.
-		SetWindowLongPtr(_hwndWhatsapp, GWLP_WNDPROC, (LONG_PTR)_originalWndProc);
 		break;
 	}
-	return TRUE;
+	case DLL_PROCESS_DETACH: {
+		LogString("Detach hook.dll from ProcessID: 0x%08X",_processID);
+
+		// Remove our window-proc from the chain by setting the original window-proc.
+		if (_originalWndProc != NULL) {
+			SetWindowLongPtr(_whatsAppWindowHandle, GWLP_WNDPROC, (LONG_PTR)_originalWndProc);
+		}
+
+		SocketCleanup();
+	} break;
+	}
+
+	return true;
 }
 
 /**
@@ -98,7 +134,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
  * 
  * This method has the advantage over SetWindowsHookEx(WH_CALLWNDPROC... that here we can skip or modifie messages.
  */
-LRESULT APIENTRY EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	std::ostringstream traceBuffer;
 
@@ -107,7 +143,7 @@ LRESULT APIENTRY EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 		// Dont print WM_GETTEXT so there is not so much "spam"
 
 		traceBuffer << MODULE_NAME << __func__ << ": " << WindowsMessage::GetString(uMsg) << "(0x" << std::uppercase << std::hex << uMsg << ") ";
-		traceBuffer << "windowName='" << GetWindowTitle(hwnd) << "' ";
+		traceBuffer << "windowTitle='" << GetWindowTitle(hwnd) << "' ";
 		traceBuffer << "hwnd='" << std::uppercase << std::hex << hwnd << "' ";
 		traceBuffer << "wParam='" << std::uppercase << std::hex << wParam << "' ";
 		TraceStream(traceBuffer);
@@ -117,7 +153,7 @@ LRESULT APIENTRY EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 	if (uMsg == WM_SYSCOMMAND) {
 		// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
 		if (wParam == SC_MINIMIZE) {
-			TraceString(MODULE_NAME "SC_MINIMIZE");
+			LogString(MODULE_NAME "::%s: SC_MINIMIZE received", __func__);
 
 			// Here i check if the windowtitle matches. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
 			if (IsTopLevelWhatsApp(hwnd)) {
@@ -125,10 +161,7 @@ LRESULT APIENTRY EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 			}
 		}
 	} else if (uMsg == WM_NCDESTROY) {
-		uintptr_t handle1 = reinterpret_cast<uintptr_t>(hwnd);
-		uintptr_t whatsappTrayWindowHandle = reinterpret_cast<uintptr_t>(FindWindow(NAME, NAME));
-		traceBuffer << MODULE_NAME << __func__ << ": " << "WM_NCDESTROY whatsappTrayWindowHandle='" << whatsappTrayWindowHandle << "'";
-		TraceStream(traceBuffer);
+		LogString(MODULE_NAME "::%s: WM_NCDESTROY received", __func__);
 
 		if (IsTopLevelWhatsApp(hwnd)) {
 			auto successfulSent = SendMessageToWhatsappTray(hwnd, WM_WHAHTSAPP_CLOSING);
@@ -138,23 +171,21 @@ LRESULT APIENTRY EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 		}
 	} else if (uMsg == WM_CLOSE) {
 		// This happens when alt + f4 is pressed.
-		traceBuffer << MODULE_NAME << __func__ << ": WM_CLOSE received.";
-		TraceStream(traceBuffer);
+		LogString(MODULE_NAME "::%s: WM_CLOSE received", __func__);
 
 		// Notify WhatsappTray and if it wants to close it can do so...
 		SendMessageToWhatsappTray(hwnd, WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE);
 
-		traceBuffer << MODULE_NAME << __func__ << ": WM_CLOSE blocked.";
+		LogString(MODULE_NAME "::%s: WM_CLOSE blocked.", __func__);
 		// Block WM_CLOSE
 		return 0;
 	} else if (uMsg == WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE) {
 		// This message is defined by me and should only come from WhatsappTray.
 		// It more or less replaces WM_CLOSE which is now always blocked...
 		// To have a way to still send WM_CLOSE this message was made.
-		traceBuffer << MODULE_NAME << __func__ << ": WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE received.";
-		TraceStream(traceBuffer);
+		LogString(MODULE_NAME "::%s: WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE received", __func__);
 
-		traceBuffer << MODULE_NAME << __func__ << ": Send WM_CLOSE to WhatsApp.";
+		LogString(MODULE_NAME "::%s: Send WM_CLOSE to WhatsApp.", __func__);
 		// NOTE: lParam/wParam are not used in WM_CLOSE.
 		return CallWindowProc(_originalWndProc, hwnd, WM_CLOSE, 0, 0);
 	}
@@ -164,32 +195,8 @@ LRESULT APIENTRY EditSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 }
 
 /**
- * Search for the main whatsapp window
+ * THIS IS CURRENTLY ONLY A DUMMY. BUT THE SetWindowsHookEx() IS STILL USED TO INJECT THE DLL INTO THE TARGET (WhatsApp)
  * 
- * Be carefull, one process can have multiple windows.
- * Thats why the window-title also gets checked.
- */
-BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM lParam)
-{
-	DWORD processId;
-	auto result = GetWindowThreadProcessId(hwnd, &processId);
-
-	// Check processId and Title
-	// Already observerd an instance where the processId alone lead to an false match!
-	if (_processIdWhatsapp == processId && GetWindowTitle(hwnd).compare(WHATSAPP_CLIENT_NAME) == 0)
-	{
-		// Found the matching processId
-		_hwndWhatsapp = hwnd;
-
-		// Stop enumeration
-		return false;
-	}
-
-	// Continue enumeration
-	return true;
-}
-
-/**
  * Only works for 32-bit apps or 64-bit apps depending on whether this is complied as 32-bit or 64-bit (Whatsapp is a 64Bit-App)
  * NOTE: This only caputers messages sent by SendMessage() and NOT PostMessage()!
  * NOTE: This function also receives messages from child-windows.
@@ -201,100 +208,24 @@ BOOL CALLBACK EnumWindowsCallback(HWND hwnd, LPARAM lParam)
  */
 LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-	if (nCode < HC_ACTION) {
-		return CallNextHookEx(NULL, nCode, wParam, lParam);
-	}
-	//CWPSTRUCT* msg = reinterpret_cast<CWPSTRUCT*>(lParam);
-
 	return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
-// This function is should not be active in normal distribution-version
-// Only for debugging. The call to SetWindowsHookEx(WH_CALLWNDPROC, ... to use this function instead of the "normal" one.
-LRESULT CALLBACK CallWndRetProcDebug(int nCode, WPARAM wParam, LPARAM lParam)
-{
-	//if (nCode >= 0)
-	{
-		CWPSTRUCT *msg = (CWPSTRUCT*)lParam;
-
-		//if (msg->hwnd == (HWND)0x00120A42)
-		if (msg->hwnd == FindWindow(NULL, WHATSAPP_CLIENT_NAME)) {
-
-			if (msg->message == 0x2 || msg->message == 528 || msg->message == 70 || msg->message == 71 || msg->message == 28 || msg->message == 134 || msg->message == 6 || msg->message == 641 || msg->message == 642 || msg->message == 7 || msg->message == 533 || msg->message == 144 || msg->message == 70 || msg->message == 71 || msg->message == 134 || msg->message == 6 || msg->message == 28 || msg->message == 8 || msg->message == 641 || msg->message == 642 || msg->message == 626 || msg->message == 2) {
-				
-				// WM_DESTROY
-
-				//std::ostringstream filename2;
-				//filename2 << "C:/hooktest/HWND_" << msg->hwnd << ".txt";
-
-				//std::ofstream myfile;
-				//myfile.open(filename2.str().c_str(), std::ios::app);
-
-				////LONG wndproc = GetWindowLong(msg->hwnd, -4);
-
-				//myfile << "\nblocked (" << msg->message << ")" << msg->wParam;
-
-				//MSG msgr;
-				//PeekMessage(&msgr, msg->hwnd, 0, 0, PM_REMOVE);
-
-				return 0;
-			}
-
-			//if (msg->message == WM_SYSCOMMAND)
-			{
-				std::ostringstream filename;
-				filename << "C:/hooktest/HWND_" << msg->hwnd << ".txt";
-
-				std::ofstream myfile;
-				myfile.open(filename.str().c_str(), std::ios::app);
-
-				myfile << "\nWM_SYSCOMMAND (" << msg->message << ")" << msg->wParam;
-
-				if (msg->wParam == 61472) {
-					myfile << "\nMinimize";
-					myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
-
-					PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, reinterpret_cast<LPARAM>(msg->hwnd));
-				}
-				myfile.close();
-			}
-
-		}
-
-	}
-
-	return CallNextHookEx(NULL, nCode, wParam, lParam);
-}
-
-LRESULT CALLBACK CBTProc(_In_ int nCode, _In_ WPARAM wParam, _In_ LPARAM lParam)
-{
-	if (nCode == HCBT_DESTROYWND) {
-		std::ostringstream filename;
-		filename << "C:/hooktest/HWND_" << (HWND)wParam << ".txt";
-
-		std::ofstream myfile;
-		myfile.open(filename.str().c_str(), std::ios::app);
-
-		myfile << "\nblocked (";
-
-
-		return 1;
-	}
-	return CallNextHookEx(_cbtProc, nCode, wParam, lParam);
-}
-
-LRESULT CALLBACK MouseProc(_In_ int nCode, _In_ WPARAM wParam, _In_ LPARAM lParam)
+/**
+ * @brief Mouse-hook
+*/
+LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
 	if (nCode >= 0) {
 		if (wParam == WM_LBUTTONDOWN) {
-			//std::ostringstream filename2;
-			//filename2 << "C:/hooktest/HWND_" << (HWND)wParam << ".txt";
+			//auto fileName = string_format("C:/hooktest/HWND_%d.txt", (HWND)wParam);
 
 			//std::ofstream myfile;
-			//myfile.open(filename2.str().c_str(), std::ios::app);
+			//myfile.open(fileName.str().c_str(), std::ios::app);
 
-			MOUSEHOOKSTRUCT *mhs = (MOUSEHOOKSTRUCT*)lParam;
+			LogString(MODULE_NAME "::%s: WM_LBUTTONDOWN received", __func__);
 
+			MOUSEHOOKSTRUCT* mhs = (MOUSEHOOKSTRUCT*)lParam;
 			RECT rect;
 			GetWindowRect(mhs->hwnd, &rect);
 
@@ -305,7 +236,7 @@ LRESULT CALLBACK MouseProc(_In_ int nCode, _In_ WPARAM wParam, _In_ LPARAM lPara
 			bool mouseOnClosebutton = PtInRect(&rect, mhs->pt);
 
 			if (mouseOnClosebutton) {
-				//OutputDebugStringA(MODULE_NAME "Closebutton mousedown");
+				//TraceString(MODULE_NAME "Closebutton mousedown");
 				//myfile << "\nMinimize";
 				//myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
 
@@ -317,24 +248,72 @@ LRESULT CALLBACK MouseProc(_In_ int nCode, _In_ WPARAM wParam, _In_ LPARAM lPara
 		}
 	}
 
-	return CallNextHookEx(_cbtProc, nCode, wParam, lParam);
+	return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
 /**
- * To verify that we found the correct window:
- * 1. Check if its a toplevel-window (below desktop)
- * 2. Match the window-name with whatsapp.
+ * @brief Returns the window-handle for the window with the searched name in the current process
+ * 
+ * https://stackoverflow.com/questions/31384004/can-several-windows-be-bound-to-the-same-process
+ * Windows are associated with threads.
+ * Threads are associated with processes.
+ * A thread can create as many top-level windows as it likes.
+ * Therefore you can perfectly well have multiple top-level windows associated with the same thread.
+ * @return 
+*/
+static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle)
+{
+	_tempWindowHandle = NULL;
+
+	_searchedWindowTitle = searchedWindowTitle;
+	EnumWindows(FindTopLevelWindowhandleWithNameCallback, NULL);
+
+	return _tempWindowHandle;
+}
+
+/**
+ * @brief Search the window-handle for the current process
+ *
+ * Be carefull, one process can have multiple windows.
+ * Thats why the window-title also gets checked.
  */
-bool IsTopLevelWhatsApp(HWND hwnd)
+static BOOL CALLBACK FindTopLevelWindowhandleWithNameCallback(HWND hwnd, LPARAM lParam)
+{
+	DWORD processId;
+	auto result = GetWindowThreadProcessId(hwnd, &processId);
+
+	// Check processId and Title
+	// Already observerd an instance where the processId alone lead to an false match!
+	if (_processID == processId) {
+		// Found the matching processId
+
+		if (WindowhandleIsToplevelWithTitle(hwnd, _searchedWindowTitle)) {
+			// The window is the root-window
+
+			_tempWindowHandle = hwnd;
+
+			// Stop enumeration
+			return false;
+		}
+	}
+
+	// Continue enumeration
+	return true;
+}
+
+/**
+ * @brief Returns true if the window-handle and the title match
+ */
+static bool WindowhandleIsToplevelWithTitle(HWND hwnd, std::string searchedWindowTitle)
 {
 	if (hwnd != GetAncestor(hwnd, GA_ROOT)) {
-		TraceString(MODULE_NAME "IsTopLevelWhatsApp: Window is not a toplevel-window.");
+		TraceString(MODULE_NAME "WindowhandleIsToplevelWithTitle: Window is not a toplevel-window.");
 		return false;
 	}
 
-	auto windowName = GetWindowTitle(hwnd);
-	if (windowName.compare(WHATSAPP_CLIENT_NAME) != 0) {
-		TraceString(std::string(MODULE_NAME "IsTopLevelWhatsApp: windowName='") + windowName + "' does not match '" WHATSAPP_CLIENT_NAME "'." + windowName);
+	auto windowTitle = GetWindowTitle(hwnd);
+	if (windowTitle.compare(searchedWindowTitle) != 0) {
+		TraceString(std::string(MODULE_NAME "WindowhandleIsToplevelWithTitle: windowTitle='") + windowTitle + "' does not match '" WHATSAPP_CLIENT_NAME "'." + windowTitle);
 		return false;
 	}
 
@@ -342,9 +321,19 @@ bool IsTopLevelWhatsApp(HWND hwnd)
 }
 
 /**
- * Gets the text of a window.
+ * To verify that we found the correct window:
+ * 1. Check if its a toplevel-window (below desktop)
+ * 2. Match the window-name with whatsapp.
  */
-std::string GetWindowTitle(HWND hwnd)
+static bool IsTopLevelWhatsApp(HWND hwnd)
+{
+	return WindowhandleIsToplevelWithTitle(hwnd, WHATSAPP_CLIENT_NAME);
+}
+
+/**
+ * @brief Gets the text of a window.
+ */
+static std::string GetWindowTitle(HWND hwnd)
 {
 	char windowNameBuffer[2000];
 	GetWindowTextA(hwnd, windowNameBuffer, sizeof(windowNameBuffer));
@@ -353,69 +342,78 @@ std::string GetWindowTitle(HWND hwnd)
 }
 
 /**
- * Send message to WhatsappTray.
+ * @brief Get the path to the executable for the ProcessID
+ * 
+ * @param processId The ProcessID from which the path to the executable should be fetched
+ * @return The path to the executable from the ProcessID
+*/
+static std::string GetFilepathFromProcessID(DWORD processId)
+{
+	HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+	if (processHandle == NULL) {
+		return "";
+	}
+
+	wchar_t filepath[MAX_PATH];
+	if (GetModuleFileNameExW(processHandle, NULL, filepath, MAX_PATH) == 0) {
+		CloseHandle(processHandle);
+		return "";
+	}
+	CloseHandle(processHandle);
+
+	return WideToUtf8(filepath);
+}
+
+static std::string WideToUtf8(const std::wstring& inputString)
+{
+	int size_needed = WideCharToMultiByte(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), NULL, 0, NULL, NULL);
+	std::string strTo(size_needed, 0);
+	WideCharToMultiByte(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), &strTo[0], size_needed, NULL, NULL);
+	return strTo;
+}
+
+static std::string GetEnviromentVariable(const std::string& inputString)
+{
+	size_t requiredSize;
+	const size_t varbufferSize = 2000;
+	char varbuffer[varbufferSize];
+
+	getenv_s(
+		&requiredSize,
+		varbuffer,
+		varbufferSize,
+		inputString.c_str()
+	);
+
+	return varbuffer;
+}
+
+/**
+ * @brief Send message to WhatsappTray.
  */
-bool SendMessageToWhatsappTray(HWND hwnd, UINT message)
+static bool SendMessageToWhatsappTray(HWND hwnd, UINT message)
 {
 	return PostMessage(FindWindow(NAME, NAME), message, 0, reinterpret_cast<LPARAM>(hwnd));
 }
 
-void TraceString(std::string traceString)
+static void TraceString(std::string traceString)
 {
-#ifdef _DEBUG
-	OutputDebugStringA(traceString.c_str());
-#endif
+	SocketSendMessage(LOGGER_IP, LOGGER_PORT, traceString.c_str());
+
+//#ifdef _DEBUG
+//	OutputDebugStringA(traceString.c_str());
+//#endif
 }
 
-void TraceStream(std::ostringstream& traceBuffer)
+static void TraceStream(std::ostringstream& traceBuffer)
 {
-#ifdef _DEBUG
-	OutputDebugStringA(traceBuffer.str().c_str());
+	SocketSendMessage(LOGGER_IP, LOGGER_PORT, traceBuffer.str().c_str());
 	traceBuffer.clear();
 	traceBuffer.str(std::string());
-#endif
+
+//#ifdef _DEBUG
+//	OutputDebugStringA(traceBuffer.str().c_str());
+//	traceBuffer.clear();
+//	traceBuffer.str(std::string());
+//#endif
 }
-
-/**
- * Registers the hook.
- *
- * @param hLib
- * @param threadId If threadId 0 is passed, it is a global Hook.
- * @param closeToTray
- * @return
- */
-BOOL DLLIMPORT RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
-{
-	if (!closeToTray) {
-		_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
-		if (_hWndProc == NULL) {
-			OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
-			UnRegisterHook();
-			return FALSE;
-		}
-	}
-
-	if (closeToTray) {
-		_mouseProc = SetWindowsHookEx(WH_MOUSE, (HOOKPROC)MouseProc, hLib, threadId);
-		if (_mouseProc == NULL) {
-			OutputDebugStringA(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
-			UnRegisterHook();
-			return FALSE;
-		}
-	}
-
-	return TRUE;
-}
-
-void DLLIMPORT UnRegisterHook()
-{
-	if (_hWndProc) {
-		UnhookWindowsHookEx(_hWndProc);
-		_hWndProc = NULL;
-	}
-	if (_mouseProc) {
-		UnhookWindowsHookEx(_mouseProc);
-		_mouseProc = NULL;
-	}
-}
-
