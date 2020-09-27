@@ -6,12 +6,11 @@
 */
 
 #define MAJOR 1
-#define MINOR 5
+#define MINOR 6
 #define PATCH 0
-#define _DEBUG
 
 #ifdef _DEBUG
-#define IS_DEBUG 4
+#define IS_DEBUG 1
 #else
 #define IS_DEBUG 0
 #endif
