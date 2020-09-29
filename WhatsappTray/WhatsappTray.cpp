@@ -453,9 +453,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		SetHook();
 		break;
 	case WM_ADDTRAY:
-		Logger::Info(MODULE_NAME "::WndProc() - WM_ADDTRAY");
-		messagesSinceMinimize = 0;
-		trayManager->MinimizeWindowToTray(_hwndWhatsapp);
+		Logger::Info(MODULE_NAME "::WndProc() - WM_ADDTRAY fromHwnd=0x%08X wParam=%d", lParam, wParam);
+
+		if (AppData::CloseToTray.Get() == true && wParam == 0) {
+			Logger::Info(MODULE_NAME "::WndProc() - Don't add to tray because 'close to tray' is activated.");
+		}
+		else {
+			messagesSinceMinimize = 0;
+			trayManager->MinimizeWindowToTray(_hwndWhatsapp);
+		}
 		break;
 	case WM_TRAYCMD:
 #pragma WARNING(Move into TrayManager. Problem is executeMenue...)

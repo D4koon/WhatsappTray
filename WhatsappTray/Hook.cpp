@@ -63,7 +63,7 @@ static std::string GetWindowTitle(HWND hwnd);
 static std::string GetFilepathFromProcessID(DWORD processId);
 static std::string WideToUtf8(const std::wstring& inputString);
 static std::string GetEnviromentVariable(const std::string& inputString);
-static bool SendMessageToWhatsappTray(HWND hwnd, UINT message);
+static bool SendMessageToWhatsappTray(HWND hwnd, UINT message, WPARAM wParam = 0);
 static void TraceString(std::string traceString);
 static void TraceStream(std::ostringstream& traceBuffer);
 
@@ -240,7 +240,7 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 				//myfile << "\nMinimize";
 				//myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
 
-				PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)mhs->hwnd);
+				SendMessageToWhatsappTray(mhs->hwnd, WM_ADDTRAY, 1);
 
 				// Returning nozero blocks the message frome being sent to the application.
 				return 1;
@@ -391,9 +391,9 @@ static std::string GetEnviromentVariable(const std::string& inputString)
 /**
  * @brief Send message to WhatsappTray.
  */
-static bool SendMessageToWhatsappTray(HWND hwnd, UINT message)
+static bool SendMessageToWhatsappTray(HWND hwnd, UINT message, WPARAM wParam)
 {
-	return PostMessage(FindWindow(NAME, NAME), message, 0, reinterpret_cast<LPARAM>(hwnd));
+	return PostMessage(FindWindow(NAME, NAME), message, wParam, reinterpret_cast<LPARAM>(hwnd));
 }
 
 static void TraceString(std::string traceString)
