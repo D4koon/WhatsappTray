@@ -53,7 +53,6 @@ static std::string _searchedWindowTitle; /* For GetTopLevelWindowhandleWithName(
 
 static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 // NOTE: extern "C" is important to disable name-mangling, so that the functions can be found with GetProcAddress(), which is used in WhatsappTray.cpp
-extern "C" DLLIMPORT LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam);
 extern "C" DLLIMPORT LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam);
 static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle);
 static BOOL CALLBACK FindTopLevelWindowhandleWithNameCallback(HWND hwnd, LPARAM lParam);
@@ -63,7 +62,7 @@ static std::string GetWindowTitle(HWND hwnd);
 static std::string GetFilepathFromProcessID(DWORD processId);
 static std::string WideToUtf8(const std::wstring& inputString);
 static std::string GetEnviromentVariable(const std::string& inputString);
-static bool SendMessageToWhatsappTray(HWND hwnd, UINT message, WPARAM wParam = 0);
+static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam = 0, LPARAM lParam = 0);
 static void TraceString(std::string traceString);
 static void TraceStream(std::ostringstream& traceBuffer);
 
@@ -157,14 +156,14 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 
 			// Here i check if the windowtitle matches. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
 			if (IsTopLevelWhatsApp(hwnd)) {
-				SendMessageToWhatsappTray(hwnd, WM_ADDTRAY);
+				SendMessageToWhatsappTray(WM_WA_MINIMIZE_BUTTON_PRESSED);
 			}
 		}
 	} else if (uMsg == WM_NCDESTROY) {
 		LogString(MODULE_NAME "::%s: WM_NCDESTROY received", __func__);
 
 		if (IsTopLevelWhatsApp(hwnd)) {
-			auto successfulSent = SendMessageToWhatsappTray(hwnd, WM_WHAHTSAPP_CLOSING);
+			auto successfulSent = SendMessageToWhatsappTray(WM_WHAHTSAPP_CLOSING);
 			if (successfulSent) {
 				TraceString(MODULE_NAME "WM_WHAHTSAPP_CLOSING successful sent.");
 			}
@@ -174,7 +173,7 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 		LogString(MODULE_NAME "::%s: WM_CLOSE received", __func__);
 
 		// Notify WhatsappTray and if it wants to close it can do so...
-		SendMessageToWhatsappTray(hwnd, WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE);
+		SendMessageToWhatsappTray(WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE);
 
 		LogString(MODULE_NAME "::%s: WM_CLOSE blocked.", __func__);
 		// Block WM_CLOSE
@@ -195,34 +194,13 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 }
 
 /**
- * THIS IS CURRENTLY ONLY A DUMMY. BUT THE SetWindowsHookEx() IS STILL USED TO INJECT THE DLL INTO THE TARGET (WhatsApp)
- * 
- * Only works for 32-bit apps or 64-bit apps depending on whether this is complied as 32-bit or 64-bit (Whatsapp is a 64Bit-App)
- * NOTE: This only caputers messages sent by SendMessage() and NOT PostMessage()!
- * NOTE: This function also receives messages from child-windows.
- * - This means we have to be carefull not accidently mix them.
- * - For example when watching for WM_NCDESTROY, it is possible that a childwindow does that but the mainwindow remains open.
- * @param nCode
- * @param wParam
- * @param lParam Contains a CWPSTRUCT*-struct in which the data can be found.
- */
-LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
-{
-	return CallNextHookEx(NULL, nCode, wParam, lParam);
-}
-
-/**
  * @brief Mouse-hook
+ * NOTE: This hook is also used to inject the dll so this can not be removed currently
 */
 LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
 	if (nCode >= 0) {
 		if (wParam == WM_LBUTTONDOWN) {
-			//auto fileName = string_format("C:/hooktest/HWND_%d.txt", (HWND)wParam);
-
-			//std::ofstream myfile;
-			//myfile.open(fileName.str().c_str(), std::ios::app);
-
 			LogString(MODULE_NAME "::%s: WM_LBUTTONDOWN received", __func__);
 
 			MOUSEHOOKSTRUCT* mhs = (MOUSEHOOKSTRUCT*)lParam;
@@ -236,11 +214,7 @@ LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
 			bool mouseOnClosebutton = PtInRect(&rect, mhs->pt);
 
 			if (mouseOnClosebutton) {
-				//TraceString(MODULE_NAME "Closebutton mousedown");
-				//myfile << "\nMinimize";
-				//myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
-
-				SendMessageToWhatsappTray(mhs->hwnd, WM_ADDTRAY, 1);
+				SendMessageToWhatsappTray(WM_WA_CLOSE_BUTTON_PRESSED);
 
 				// Returning nozero blocks the message frome being sent to the application.
 				return 1;
@@ -378,12 +352,7 @@ static std::string GetEnviromentVariable(const std::string& inputString)
 	const size_t varbufferSize = 2000;
 	char varbuffer[varbufferSize];
 
-	getenv_s(
-		&requiredSize,
-		varbuffer,
-		varbufferSize,
-		inputString.c_str()
-	);
+	getenv_s(&requiredSize, varbuffer, varbufferSize, inputString.c_str());
 
 	return varbuffer;
 }
@@ -391,9 +360,9 @@ static std::string GetEnviromentVariable(const std::string& inputString)
 /**
  * @brief Send message to WhatsappTray.
  */
-static bool SendMessageToWhatsappTray(HWND hwnd, UINT message, WPARAM wParam)
+static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam, LPARAM lParam)
 {
-	return PostMessage(FindWindow(NAME, NAME), message, wParam, reinterpret_cast<LPARAM>(hwnd));
+	return PostMessage(FindWindow(NAME, NAME), message, wParam, lParam);
 }
 
 static void TraceString(std::string traceString)

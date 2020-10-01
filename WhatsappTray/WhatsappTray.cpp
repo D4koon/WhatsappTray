@@ -48,23 +48,20 @@ constexpr auto CompileConfiguration = "Release";
 #undef MODULE_NAME
 #define MODULE_NAME "WhatsappTray"
 
-static char moduleName[] = MODULE_NAME;
+static HINSTANCE _hInstance = NULL;
+static HWND _hwndWhatsappTray = NULL;
+static HWND _hwndForMenu = NULL;
+static HWND _hwndWhatsapp = NULL;
 
-static HHOOK _hWndProc = NULL;
 static HHOOK _mouseProc = NULL;
+static HMODULE _hLib = NULL;
 
-static HINSTANCE _hInstance;
-static HMODULE _hLib;
-static HWND _hwndWhatsappTray;
-static HWND _hwndForMenu;
-static HWND _hwndWhatsapp;
+static int _messagesSinceMinimize = 0;
 
-static int messagesSinceMinimize = 0;
+static char _loggerPort[] = LOGGER_PORT;
+static std::thread _winsockThread;
 
-static char loggerPort[] = LOGGER_PORT;
-static std::thread winsockThread;
-
-static std::unique_ptr<TrayManager> trayManager;
+static std::unique_ptr<TrayManager> _trayManager;
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static HWND FindWhatsapp();
@@ -72,9 +69,8 @@ static HWND StartWhatsapp();
 static void TryClosePreviousWhatsappTrayInstance();
 static bool CreateWhatsappTrayWindow();
 static bool SetHook();
-static void SetLaunchOnWindowsStartupSetting(bool value);
-static bool RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray);
 static void UnRegisterHook();
+static void SetLaunchOnWindowsStartupSetting(bool value);
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
@@ -92,7 +88,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		Logger::Info("Hook> %s", message.c_str());
 	});
 
-	winsockThread = std::thread(SocketStart, loggerPort);
+	_winsockThread = std::thread(SocketStart, _loggerPort);
 
 	WhatsAppApi::Init();
 
@@ -128,7 +124,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		WhatsAppApi::NotifyOnFullInit([]() {
 			Logger::Info(MODULE_NAME "::WinMain() - NotifyOnFullInit");
 			Sleep(2000);
-			PostMessageA(_hwndWhatsappTray, WM_ADDTRAY, 0, 0);
+			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 			// Remove event after the first execution
 			WhatsAppApi::NotifyOnFullInit(NULL);
 		});
@@ -154,8 +150,8 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 		return 0;
 	}
 
-	trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
-	trayManager->AddWindowToTray(_hwndWhatsapp);
+	_trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
+	_trayManager->AddWindowToTray(_hwndWhatsapp);
 
 	// Send a WM_WHATSAPP_API_NEW_MESSAGE-message when a new WhatsApp-message has arrived.
 	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_WHATSAPP_API_NEW_MESSAGE, 0, 0); });
@@ -411,11 +407,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	//Logger::Info(MODULE_NAME "::WndProc() - Message Received msg='0x%X'", msg);
 
 	switch (msg) {
-	case WM_COMMAND:
+	case WM_COMMAND: {
 		switch (LOWORD(wParam)) {
-		case IDM_ABOUT:
+		case IDM_ABOUT: {
 			AboutDialog::Create(_hInstance, _hwndWhatsappTray);
-			break;
+		} break;
 		case IDM_SETTING_CLOSE_TO_TRAY: {
 			// Toggle the 'close to tray'-feature.
 			// We have to first change the value and then unregister and register to set the ne value in the hook.
@@ -423,75 +419,81 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 			SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
 		} break;
-		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP:
+		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP: {
 			// Toggle the 'launch on windows startup'-feature.
 			SetLaunchOnWindowsStartupSetting(!AppData::LaunchOnWindowsStartup.Get());
-			break;
-		case IDM_SETTING_START_MINIMIZED:
+		} break;
+		case IDM_SETTING_START_MINIMIZED: {
 			// Toggle the 'start minimized'-feature.
 			AppData::StartMinimized.Set(!AppData::StartMinimized.Get());
-			break;
-		case IDM_SETTING_SHOW_UNREAD_MESSAGES:
+		} break;
+		case IDM_SETTING_SHOW_UNREAD_MESSAGES: {
 			// Toggle the 'ShowUnreadMessages'-feature.
 			AppData::ShowUnreadMessages.Set(!AppData::ShowUnreadMessages.Get());
-			break;
-		case IDM_RESTORE:
+		} break;
+		case IDM_RESTORE: {
 			Logger::Info(MODULE_NAME "::WndProc() - IDM_RESTORE");
-			trayManager->RestoreWindowFromTray(_hwndForMenu);
-			break;
-		case IDM_CLOSE:
-			trayManager->CloseWindowFromTray(_hwndForMenu);
+			_trayManager->RestoreWindowFromTray(_hwndForMenu);
+		} break;
+		case IDM_CLOSE: {
+			_trayManager->CloseWindowFromTray(_hwndForMenu);
 
 			// Running WhatsappTray without Whatsapp makes no sence because if a new instance of Whatsapp is started, WhatsappTray would not hook it. Atleast not in the current implementation...
 			DestroyWindow(_hwndWhatsappTray);
-			break;
+		} break;
 		}
-		break;
-	case WM_REAPPLY_HOOK:
+	} break;
+	case WM_REAPPLY_HOOK: {
 		UnRegisterHook();
 		_hwndWhatsapp = FindWhatsapp();
 		SetHook();
-		break;
-	case WM_ADDTRAY:
-		Logger::Info(MODULE_NAME "::WndProc() - WM_ADDTRAY fromHwnd=0x%08X wParam=%d", lParam, wParam);
+	}break;
+	case WM_WA_MINIMIZE_BUTTON_PRESSED: {
+		Logger::Info(MODULE_NAME "::WndProc() - WM_WA_MINIMIZE_BUTTON_PRESSED");
 
-		if (AppData::CloseToTray.Get() == true && wParam == 0) {
-			Logger::Info(MODULE_NAME "::WndProc() - Don't add to tray because 'close to tray' is activated.");
+		if (AppData::CloseToTray.Get() == true) {
+			Logger::Info(MODULE_NAME "::WndProc() - Close to tray is true => Minimize WhatsApp to taskbar.");
+		} else {
+			Logger::Info(MODULE_NAME "::WndProc() - Close to tray is false => Minimize WhatsApp to tray.");
+			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 		}
-		else {
-			messagesSinceMinimize = 0;
-			trayManager->MinimizeWindowToTray(_hwndWhatsapp);
+	} break;
+	case WM_WA_CLOSE_BUTTON_PRESSED: {
+		Logger::Info(MODULE_NAME "::WndProc() - WM_WA_CLOSE_BUTTON_PRESSED");
+
+		if (AppData::CloseToTray.Get() == true) {
+			Logger::Info(MODULE_NAME "::WndProc() - Close to tray is true => Minimize WhatsApp to tray.");
+			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
+		} else {
+			Logger::Info(MODULE_NAME "::WndProc() - Close to tray is false => Close WhatsApp and WhatsappTray.");
+			_trayManager->CloseWindowFromTray(_hwndWhatsapp);
 		}
-		break;
-	case WM_TRAYCMD:
+	} break;
+	case WM_TRAYCMD: {
 #pragma WARNING(Move into TrayManager. Problem is executeMenue...)
 		switch (static_cast<UINT>(lParam)) {
-		case NIN_SELECT:
-			trayManager->RestoreFromTray(wParam);
-			break;
-		case WM_CONTEXTMENU:
-			_hwndForMenu = trayManager->GetHwndFromIndex(wParam);
+		case NIN_SELECT: {
+			_trayManager->RestoreFromTray(wParam);
+		} break;
+		case WM_CONTEXTMENU: {
+			_hwndForMenu = _trayManager->GetHwndFromIndex(wParam);
 			ExecuteMenu();
-			break;
-		case WM_MOUSEMOVE:
-			//HWND handleWindow = trayManager->GetHwndFromIndex(wParam);
-			//trayManager->RefreshWindowInTray(handleWindow);
-			break;
+		} break;
 		}
-		break;
-
-	case WM_WHAHTSAPP_CLOSING:
+	}break;
+	case WM_WHAHTSAPP_CLOSING: {
 		// If Whatsapp is closing we want to close WhatsappTray as well.
 		Logger::Info(MODULE_NAME "::WndProc() - WM_WHAHTSAPP_CLOSING");
 		DestroyWindow(_hwndWhatsappTray);
-	case WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE:
+	} break;
+	case WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE: {
 		Logger::Info(MODULE_NAME "::" + std::string(__func__) + "() - WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE received");
 		// This message means that WhatsApp received a WM_CLOSE-message.
 		// This happens when alt + f4 is pressed.
 
 		if (AppData::CloseToTray.Get()) {
 			// Close to tray is activated => Minimize Whatsapp to tray.
-			PostMessage(hwnd, WM_ADDTRAY, 0, 0);
+			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 		}
 		else {
 			// Close to tray is not activated => Close Whatsapp.
@@ -500,36 +502,36 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			PostMessage(_hwndWhatsapp, WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE, 0, 0);
 			Logger::Info(MODULE_NAME "::WndProc() - WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE sent");
 		}
-		
-		break;
-	case WM_DESTROY:
+
+	} break;
+	case WM_DESTROY: {
 		Logger::Info(MODULE_NAME "::WndProc() - WM_DESTROY");
 
-		trayManager->RestoreAllWindowsFromTray();
-		trayManager->RemoveTrayIcon(_hwndWhatsapp);
+		_trayManager->RestoreAllWindowsFromTray();
+		_trayManager->RemoveTrayIcon(_hwndWhatsapp);
 
 		UnRegisterHook();
 		FreeLibrary(_hLib);
 
 		// Stop winsock-server and wait for it to cleanup and finish
 		SocketStopServer();
-		winsockThread.join();
+		_winsockThread.join();
 
 		PostQuitMessage(0);
 		Logger::Info(MODULE_NAME "::WndProc() - QuitMessage posted.");
-		break;
-	case WM_WHATSAPP_API_NEW_MESSAGE:
+	} break;
+	case WM_WHATSAPP_API_NEW_MESSAGE: {
 
 		Logger::Info(MODULE_NAME "::WndProc() - WM_WHATSAPP_API_NEW_MESSAGE");
-		messagesSinceMinimize++;
+		_messagesSinceMinimize++;
 
 		if (AppData::ShowUnreadMessages.Get()) {
 			char messagesSinceMinimizeBuffer[20] = { 0 };
-			snprintf(messagesSinceMinimizeBuffer, sizeof(messagesSinceMinimizeBuffer), "%d", messagesSinceMinimize);
-			trayManager->SetIcon(_hwndWhatsapp, messagesSinceMinimizeBuffer);
+			snprintf(messagesSinceMinimizeBuffer, sizeof(messagesSinceMinimizeBuffer), "%d", _messagesSinceMinimize);
+			_trayManager->SetIcon(_hwndWhatsapp, messagesSinceMinimizeBuffer);
 		}
-		
-		break;
+
+	} break;
 	}
 
 	return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -547,11 +549,30 @@ bool SetHook()
 		return false;
 	}
 
-	if (RegisterHook(_hLib, threadId, AppData::CloseToTray.Get()) == false) {
+	auto MouseProc = (HOOKPROC)GetProcAddress(_hLib, "MouseProc");
+	if (MouseProc == NULL) {
+		Logger::Error("The function 'MouseProc' was not found.");
 		MessageBox(NULL, "Error setting hook procedure.", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return false;
 	}
+
+	_mouseProc = SetWindowsHookEx(WH_MOUSE, (HOOKPROC)MouseProc, _hLib, threadId);
+	if (_mouseProc == NULL) {
+		Logger::Error(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc");
+		MessageBox(NULL, "Error setting hook procedure.", "WhatsappTray", MB_OK | MB_ICONERROR);
+		UnRegisterHook();
+		return false;
+	}
+
 	return true;
+}
+
+void UnRegisterHook()
+{
+	if (_mouseProc) {
+		UnhookWindowsHookEx(_mouseProc);
+		_mouseProc = NULL;
+	}
 }
 
 /*
@@ -565,61 +586,5 @@ void SetLaunchOnWindowsStartupSetting(bool value)
 		Registry::RegisterProgram();
 	} else {
 		Registry::UnregisterProgram();
-	}
-}
-
-/**
- * Registers the hook.
- *
- * @param hLib
- * @param threadId If threadId 0 is passed, it is a global Hook.
- * @param closeToTray
- * @return
- */
-bool RegisterHook(HMODULE hLib, DWORD threadId, bool closeToTray)
-{
-	// NOTE: To see if the functions are visible use 'dumpbin /EXPORTS <pathToDll>\Hook.dll' in the debugger-console
-	auto CallWndRetProc = (HOOKPROC)GetProcAddress(_hLib, "CallWndRetProc");
-	if (CallWndRetProc == NULL) {
-		Logger::Error("The function 'CallWndRetProc' was not found.\n");
-		return false;
-	}
-
-	auto MouseProc = (HOOKPROC)GetProcAddress(_hLib, "MouseProc");
-	if (MouseProc == NULL) {
-		Logger::Error("The function 'MouseProc' was not found.\n");
-		return false;
-	}
-
-	if (!closeToTray) {
-		_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, hLib, threadId);
-		if (_hWndProc == NULL) {
-			Logger::Error(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
-			UnRegisterHook();
-			return false;
-		}
-	}
-
-	if (closeToTray) {
-		_mouseProc = SetWindowsHookEx(WH_MOUSE, (HOOKPROC)MouseProc, hLib, threadId);
-		if (_mouseProc == NULL) {
-			Logger::Error(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
-			UnRegisterHook();
-			return false;
-		}
-	}
-
-	return true;
-}
-
-void UnRegisterHook()
-{
-	if (_hWndProc) {
-		UnhookWindowsHookEx(_hWndProc);
-		_hWndProc = NULL;
-	}
-	if (_mouseProc) {
-		UnhookWindowsHookEx(_mouseProc);
-		_mouseProc = NULL;
 	}
 }
