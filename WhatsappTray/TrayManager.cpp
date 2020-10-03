@@ -63,7 +63,7 @@ void TrayManager::MinimizeWindowToTray(HWND hwnd)
 
 /**
  * If a window is already in the tray nothing will be done.
-*/
+ */
 void TrayManager::AddWindowToTray(HWND hwnd)
 {
 	// Add icon to tray if it's not already there

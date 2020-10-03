@@ -214,19 +214,23 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 		LogString("WM_LBUTTONUP received x=%d y=%d", clickPoint.x, clickPoint.y);
 
 		RECT rect;
-		GetWindowRect(hwnd, &rect);
+		GetClientRect(hwnd, &rect);
+
+		constexpr int defaultDpi = 96;
+		int widthOfButton = 46; /* dpi 96 (100%) window not maximized */
+		int heightOfButton = 34; /* dpi 96 (100%) window not maximized */
 
 		// I use percent because it is a fraction like 1,25. 100 to get value in percent
-		int dpiRatioPercentX = (100 * _dpiX) / 96;
+		int dpiRatioPercentX = (100 * _dpiX) / defaultDpi;
 		// NOTE: The width is little to big but it is better to wrongly send to tray instead of maximize then close instead of send to tray
-		int widthOfButton = (46 * dpiRatioPercentX) / 100;
-		int dpiRatioPercentY = (100 * _dpiY) / 96;
-		int heightOfButton = (34 * dpiRatioPercentY) / 100;
+		widthOfButton = (widthOfButton * dpiRatioPercentX) / 100;
+		int dpiRatioPercentY = (100 * _dpiY) / defaultDpi;
+		heightOfButton = (heightOfButton * dpiRatioPercentY) / 100;
 
 		// calculate x-distance fom right window border
 		int windowWidth = rect.right - rect.left;
 		int xDistanceFromRight = windowWidth - clickPoint.x;
-		LogString("WM_LBUTTONUP received windowWidth=%d xDistanceFromRight=%d", windowWidth, xDistanceFromRight);
+		LogString("WM_LBUTTONUP => windowWidth=%d xDistanceFromRight=%d widthOfButton=%d", windowWidth, xDistanceFromRight, widthOfButton);
 
 		if (xDistanceFromRight <= widthOfButton && clickPoint.y <= heightOfButton) {
 			SendMessageToWhatsappTray(WM_WA_CLOSE_BUTTON_PRESSED);

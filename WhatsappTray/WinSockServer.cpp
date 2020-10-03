@@ -112,6 +112,7 @@ void SocketNotifyOnNewMessage(const std::function<void(std::string)>& messageRec
 void SocketStopServer()
 {
 	isRunning = false;
+	// NOTE: closesocket() can be calld on invalid sockets, so there is no handling for that necessary
 	closesocket(listenSocket);
 	listenSocket = INVALID_SOCKET;
 }
