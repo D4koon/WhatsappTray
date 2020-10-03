@@ -53,7 +53,7 @@ static HWND _hwndWhatsappTray = NULL;
 static HWND _hwndForMenu = NULL;
 static HWND _hwndWhatsapp = NULL;
 
-static HHOOK _mouseProc = NULL;
+static HHOOK _hWndProc = NULL;
 static HMODULE _hLib = NULL;
 
 static int _messagesSinceMinimize = 0;
@@ -549,17 +549,16 @@ bool SetHook()
 		return false;
 	}
 
-	auto MouseProc = (HOOKPROC)GetProcAddress(_hLib, "MouseProc");
-	if (MouseProc == NULL) {
-		Logger::Error("The function 'MouseProc' was not found.");
-		MessageBox(NULL, "Error setting hook procedure.", "WhatsappTray", MB_OK | MB_ICONERROR);
+	// NOTE: To see if the functions are visible use 'dumpbin /EXPORTS <pathToDll>\Hook.dll' in the debugger-console
+	auto CallWndRetProc = (HOOKPROC)GetProcAddress(_hLib, "CallWndRetProc");
+	if (CallWndRetProc == NULL) {
+		Logger::Error("The function 'CallWndRetProc' was not found.\n");
 		return false;
 	}
 
-	_mouseProc = SetWindowsHookEx(WH_MOUSE, (HOOKPROC)MouseProc, _hLib, threadId);
-	if (_mouseProc == NULL) {
-		Logger::Error(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc");
-		MessageBox(NULL, "Error setting hook procedure.", "WhatsappTray", MB_OK | MB_ICONERROR);
+	_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, _hLib, threadId);
+	if (_hWndProc == NULL) {
+		Logger::Error(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
 		UnRegisterHook();
 		return false;
 	}
@@ -569,9 +568,9 @@ bool SetHook()
 
 void UnRegisterHook()
 {
-	if (_mouseProc) {
-		UnhookWindowsHookEx(_mouseProc);
-		_mouseProc = NULL;
+	if (_hWndProc) {
+		UnhookWindowsHookEx(_hWndProc);
+		_hWndProc = NULL;
 	}
 }
 
