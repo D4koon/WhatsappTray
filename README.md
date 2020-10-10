@@ -7,8 +7,8 @@ You can download that in the [WhatsApp Official Page](https://www.whatsapp.com/d
 
 ## Configuration:
 WhatsappTray can be configured through:
+- The **right-click-menue** in the tray. (Changes the values in *appData.ini*)
 - The **appData.ini** which is automatically created in the installation-folder after the first start of WhatsappTray
-- The **right-click-menue** in the tray. (Changes the values in the *appData.ini*)
 
 ### Advanced Configuration
 #### WHATSAPP_STARTPATH
