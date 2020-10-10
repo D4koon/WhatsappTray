@@ -276,6 +276,7 @@ std::map<int, char*> WindowsMessage::wmTranslation = {
 {673, "WM_MOUSEHOVER" },
 {674, "WM_NCMOUSELEAVE" },
 {675, "WM_MOUSELEAVE" },
+{736, "WM_DPICHANGED" },
 {768, "WM_CUT" },
 {769, "WM_COPY" },
 {770, "WM_PASTE" },

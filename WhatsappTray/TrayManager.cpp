@@ -63,7 +63,7 @@ void TrayManager::MinimizeWindowToTray(HWND hwnd)
 
 /**
  * If a window is already in the tray nothing will be done.
-*/
+ */
 void TrayManager::AddWindowToTray(HWND hwnd)
 {
 	// Add icon to tray if it's not already there
@@ -108,7 +108,7 @@ void TrayManager::CreateTrayIcon(int32_t index, HWND hwnd)
 
 void TrayManager::CloseWindowFromTray(HWND hwnd)
 {
-	Logger::Info(MODULE_NAME "CloseWindowFromTray()");
+	Logger::Info(MODULE_NAME "CloseWindowFromTray() x%08X", hwnd);
 
 	// Use PostMessage to avoid blocking if the program brings up a dialog on exit.
 	// NOTE: WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE is a special message i made because WM_CLOSE is always blocked by the hook

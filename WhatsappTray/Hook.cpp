@@ -25,9 +25,11 @@
 
 #include <windows.h>
 #include <iostream>
-#include <fstream>
 #include <sstream>
 #include <psapi.h> // OpenProcess()
+#include <shellscalingapi.h> // For dpi-scaling stuff
+
+#pragma comment(lib, "SHCore") // For dpi-scaling stuff
 
 // Problems with OutputDebugString:
 // Had problems that the messages from OutputDebugString in the hook-functions did not work anymore after some playing arround with old versions, suddenly it worked again.
@@ -39,8 +41,7 @@
 
 // Use DebugView (https://docs.microsoft.com/en-us/sysinternals/downloads/debugview) to see OutputDebugString() messages.
 
-#undef MODULE_NAME
-#define MODULE_NAME "WhatsappTrayHook::"
+constexpr char* MODULE_NAME = "WhatsappTrayHook";
 
 #define DLLIMPORT __declspec(dllexport)
 
@@ -51,10 +52,14 @@ static WNDPROC _originalWndProc = NULL;
 static HWND _tempWindowHandle = NULL; /* For GetTopLevelWindowhandleWithName() */
 static std::string _searchedWindowTitle; /* For GetTopLevelWindowhandleWithName() */
 
+static UINT _dpiX; /* The horizontal dpi-size. Is set in Windows settings. Default 100% = 96 */
+static UINT _dpiY; /* The vertical dpi-size. Is set in Windows settings. Default 100% = 96 */
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved);
 static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+static void UpdateDpi(HWND hwnd);
 // NOTE: extern "C" is important to disable name-mangling, so that the functions can be found with GetProcAddress(), which is used in WhatsappTray.cpp
-extern "C" DLLIMPORT LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam);
-extern "C" DLLIMPORT LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam);
+extern "C" DLLIMPORT LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam); 
 static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle);
 static BOOL CALLBACK FindTopLevelWindowhandleWithNameCallback(HWND hwnd, LPARAM lParam);
 static bool WindowhandleIsToplevelWithTitle(HWND hwnd, std::string searchedWindowTitle);
@@ -63,12 +68,18 @@ static std::string GetWindowTitle(HWND hwnd);
 static std::string GetFilepathFromProcessID(DWORD processId);
 static std::string WideToUtf8(const std::wstring& inputString);
 static std::string GetEnviromentVariable(const std::string& inputString);
-static bool SendMessageToWhatsappTray(HWND hwnd, UINT message);
+static POINT LParamToPoint(LPARAM lParam);
+static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam = 0, LPARAM lParam = 0);
 static void TraceString(std::string traceString);
 static void TraceStream(std::ostringstream& traceBuffer);
 
-#define LogString(logString, ...) TraceString(string_format(logString, __VA_ARGS__))
+#define LogString(logString, ...) TraceString(MODULE_NAME + std::string("::") + std::string(__func__) + ": " + string_format(logString, __VA_ARGS__))
 
+/**
+ * @brief The entry point for the dll
+ * 
+ * This is called when the hook is attached to the thread
+*/
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
 	switch (fdwReason)
@@ -106,7 +117,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 		if (_whatsAppWindowHandle == NULL) {
 			LogString("Error, window-handle for '" WHATSAPP_CLIENT_NAME "' was not found");
+			break;
 		}
+
+		// Update the windows scaling for the monitor that whatsapp is currently on
+		UpdateDpi(_whatsAppWindowHandle);
 
 		// Replace the original window-proc with our own. This is called subclassing.
 		// Our window-proc will call after the processing the original window-proc.
@@ -142,7 +157,7 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 	if (uMsg != WM_GETTEXT) {
 		// Dont print WM_GETTEXT so there is not so much "spam"
 
-		traceBuffer << MODULE_NAME << __func__ << ": " << WindowsMessage::GetString(uMsg) << "(0x" << std::uppercase << std::hex << uMsg << ") ";
+		traceBuffer << MODULE_NAME << "::" << __func__ << ": " << WindowsMessage::GetString(uMsg) << "(0x" << std::uppercase << std::hex << uMsg << ") ";
 		traceBuffer << "windowTitle='" << GetWindowTitle(hwnd) << "' ";
 		traceBuffer << "hwnd='" << std::uppercase << std::hex << hwnd << "' ";
 		traceBuffer << "wParam='" << std::uppercase << std::hex << wParam << "' ";
@@ -153,50 +168,108 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 	if (uMsg == WM_SYSCOMMAND) {
 		// Description for WM_SYSCOMMAND: https://msdn.microsoft.com/de-de/library/windows/desktop/ms646360(v=vs.85).aspx
 		if (wParam == SC_MINIMIZE) {
-			LogString(MODULE_NAME "::%s: SC_MINIMIZE received", __func__);
+			LogString("SC_MINIMIZE received");
 
 			// Here i check if the windowtitle matches. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
 			if (IsTopLevelWhatsApp(hwnd)) {
-				SendMessageToWhatsappTray(hwnd, WM_ADDTRAY);
+				SendMessageToWhatsappTray(WM_WA_MINIMIZE_BUTTON_PRESSED);
 			}
 		}
 	} else if (uMsg == WM_NCDESTROY) {
-		LogString(MODULE_NAME "::%s: WM_NCDESTROY received", __func__);
+		LogString("WM_NCDESTROY received");
 
 		if (IsTopLevelWhatsApp(hwnd)) {
-			auto successfulSent = SendMessageToWhatsappTray(hwnd, WM_WHAHTSAPP_CLOSING);
+			auto successfulSent = SendMessageToWhatsappTray(WM_WHAHTSAPP_CLOSING);
 			if (successfulSent) {
-				TraceString(MODULE_NAME "WM_WHAHTSAPP_CLOSING successful sent.");
+				LogString("WM_WHAHTSAPP_CLOSING successful sent.");
 			}
 		}
 	} else if (uMsg == WM_CLOSE) {
 		// This happens when alt + f4 is pressed.
-		LogString(MODULE_NAME "::%s: WM_CLOSE received", __func__);
+		LogString("WM_CLOSE received. Probably Alt + F4");
 
 		// Notify WhatsappTray and if it wants to close it can do so...
-		SendMessageToWhatsappTray(hwnd, WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE);
+		SendMessageToWhatsappTray(WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE);
 
-		LogString(MODULE_NAME "::%s: WM_CLOSE blocked.", __func__);
+		LogString("WM_CLOSE blocked.");
 		// Block WM_CLOSE
 		return 0;
 	} else if (uMsg == WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE) {
 		// This message is defined by me and should only come from WhatsappTray.
 		// It more or less replaces WM_CLOSE which is now always blocked...
 		// To have a way to still send WM_CLOSE this message was made.
-		LogString(MODULE_NAME "::%s: WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE received", __func__);
+		LogString("WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE received");
 
-		LogString(MODULE_NAME "::%s: Send WM_CLOSE to WhatsApp.", __func__);
+		LogString("Send WM_CLOSE to WhatsApp.");
 		// NOTE: lParam/wParam are not used in WM_CLOSE.
 		return CallWindowProc(_originalWndProc, hwnd, WM_CLOSE, 0, 0);
+	} else if (uMsg == WM_DPICHANGED) {
+		LogString("WM_DPICHANGED received");
+
+		LogString("Updating the Dpi");
+		UpdateDpi(_whatsAppWindowHandle);
+	} else if (uMsg == WM_LBUTTONUP) {
+		// Note x and y are clientare-coordiantes
+		auto clickPoint = LParamToPoint(lParam);
+		LogString("WM_LBUTTONUP received x=%d y=%d", clickPoint.x, clickPoint.y);
+
+		RECT rect;
+		GetClientRect(hwnd, &rect);
+
+		constexpr int defaultDpi = 96;
+		int widthOfButton = 46; /* dpi 96 (100%) window not maximized */
+		int heightOfButton = 34; /* dpi 96 (100%) window not maximized */
+
+		// I use percent because it is a fraction like 1,25. 100 to get value in percent
+		int dpiRatioPercentX = (100 * _dpiX) / defaultDpi;
+		// NOTE: The width is little to big but it is better to wrongly send to tray instead of maximize then close instead of send to tray
+		widthOfButton = (widthOfButton * dpiRatioPercentX) / 100;
+		int dpiRatioPercentY = (100 * _dpiY) / defaultDpi;
+		heightOfButton = (heightOfButton * dpiRatioPercentY) / 100;
+
+		// calculate x-distance fom right window border
+		int windowWidth = rect.right - rect.left;
+		int xDistanceFromRight = windowWidth - clickPoint.x;
+		LogString("WM_LBUTTONUP => windowWidth=%d xDistanceFromRight=%d widthOfButton=%d", windowWidth, xDistanceFromRight, widthOfButton);
+
+		if (xDistanceFromRight <= widthOfButton && clickPoint.y <= heightOfButton) {
+			SendMessageToWhatsappTray(WM_WA_CLOSE_BUTTON_PRESSED);
+
+			LogString("Block WM_LBUTTONUP");
+			return 0;
+		}
 	}
 
 	// Call the original window-proc.
 	return CallWindowProc(_originalWndProc, hwnd, uMsg, wParam, lParam);
 }
 
+
+/**
+ * @brief Update the windows scaling for the monitor that the window is currently on
+*/
+static void UpdateDpi(HWND hwnd)
+{
+	auto monitorHandle = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+
+	auto result = GetDpiForMonitor(monitorHandle, MDT_DEFAULT, &_dpiX, &_dpiY);
+
+	if (result != S_OK) {
+		LogString("Error when getting the dpi for WhatsApp");
+		// Continue even with the error...
+	}
+	else {
+		LogString("The dpi for WhatsApp is dpiX: %d dpiY: %d", _dpiX, _dpiY);
+	}
+
+	return;
+}
+
 /**
  * THIS IS CURRENTLY ONLY A DUMMY. BUT THE SetWindowsHookEx() IS STILL USED TO INJECT THE DLL INTO THE TARGET (WhatsApp)
- * 
+ * NOTE: This is better then the mousehook because it will inject the dll imediatly after SetWindowsHookEx()
+ *       The Mousehook waits until it receives a mouse-message and then attaches the dll. This means the cursor has to be move on top of WhatsApp
+ *
  * Only works for 32-bit apps or 64-bit apps depending on whether this is complied as 32-bit or 64-bit (Whatsapp is a 64Bit-App)
  * NOTE: This only caputers messages sent by SendMessage() and NOT PostMessage()!
  * NOTE: This function also receives messages from child-windows.
@@ -208,46 +281,6 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
  */
 LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-	return CallNextHookEx(NULL, nCode, wParam, lParam);
-}
-
-/**
- * @brief Mouse-hook
-*/
-LRESULT CALLBACK MouseProc(int nCode, WPARAM wParam, LPARAM lParam)
-{
-	if (nCode >= 0) {
-		if (wParam == WM_LBUTTONDOWN) {
-			//auto fileName = string_format("C:/hooktest/HWND_%d.txt", (HWND)wParam);
-
-			//std::ofstream myfile;
-			//myfile.open(fileName.str().c_str(), std::ios::app);
-
-			LogString(MODULE_NAME "::%s: WM_LBUTTONDOWN received", __func__);
-
-			MOUSEHOOKSTRUCT* mhs = (MOUSEHOOKSTRUCT*)lParam;
-			RECT rect;
-			GetWindowRect(mhs->hwnd, &rect);
-
-			// Modify rect to cover the X(close) button.
-			rect.left = rect.right - 46;
-			rect.bottom = rect.top + 35;
-
-			bool mouseOnClosebutton = PtInRect(&rect, mhs->pt);
-
-			if (mouseOnClosebutton) {
-				//TraceString(MODULE_NAME "Closebutton mousedown");
-				//myfile << "\nMinimize";
-				//myfile << "\nHWND to Hookwindow:" << FindWindow(NAME, NAME);
-
-				PostMessage(FindWindow(NAME, NAME), WM_ADDTRAY, 0, (LPARAM)mhs->hwnd);
-
-				// Returning nozero blocks the message frome being sent to the application.
-				return 1;
-			}
-		}
-	}
-
 	return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
@@ -307,13 +340,13 @@ static BOOL CALLBACK FindTopLevelWindowhandleWithNameCallback(HWND hwnd, LPARAM 
 static bool WindowhandleIsToplevelWithTitle(HWND hwnd, std::string searchedWindowTitle)
 {
 	if (hwnd != GetAncestor(hwnd, GA_ROOT)) {
-		TraceString(MODULE_NAME "WindowhandleIsToplevelWithTitle: Window is not a toplevel-window.");
+		//LogString("Window is not a toplevel-window");
 		return false;
 	}
 
 	auto windowTitle = GetWindowTitle(hwnd);
 	if (windowTitle.compare(searchedWindowTitle) != 0) {
-		TraceString(std::string(MODULE_NAME "WindowhandleIsToplevelWithTitle: windowTitle='") + windowTitle + "' does not match '" WHATSAPP_CLIENT_NAME "'." + windowTitle);
+		//LogString("windowTitle='" + windowTitle + "' does not match '" WHATSAPP_CLIENT_NAME "'");
 		return false;
 	}
 
@@ -378,22 +411,24 @@ static std::string GetEnviromentVariable(const std::string& inputString)
 	const size_t varbufferSize = 2000;
 	char varbuffer[varbufferSize];
 
-	getenv_s(
-		&requiredSize,
-		varbuffer,
-		varbufferSize,
-		inputString.c_str()
-	);
+	getenv_s(&requiredSize, varbuffer, varbufferSize, inputString.c_str());
 
 	return varbuffer;
+}
+
+static POINT LParamToPoint(LPARAM lParam)
+{
+	POINT p = { LOWORD(lParam), HIWORD(lParam) };
+
+	return p;
 }
 
 /**
  * @brief Send message to WhatsappTray.
  */
-static bool SendMessageToWhatsappTray(HWND hwnd, UINT message)
+static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam, LPARAM lParam)
 {
-	return PostMessage(FindWindow(NAME, NAME), message, 0, reinterpret_cast<LPARAM>(hwnd));
+	return PostMessage(FindWindow(NAME, NAME), message, wParam, lParam);
 }
 
 static void TraceString(std::string traceString)
