@@ -186,7 +186,7 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 		}
 	} else if (uMsg == WM_CLOSE) {
 		// This happens when alt + f4 is pressed.
-		LogString("WM_CLOSE received");
+		LogString("WM_CLOSE received. Probably Alt + F4");
 
 		// Notify WhatsappTray and if it wants to close it can do so...
 		SendMessageToWhatsappTray(WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE);
@@ -340,13 +340,13 @@ static BOOL CALLBACK FindTopLevelWindowhandleWithNameCallback(HWND hwnd, LPARAM 
 static bool WindowhandleIsToplevelWithTitle(HWND hwnd, std::string searchedWindowTitle)
 {
 	if (hwnd != GetAncestor(hwnd, GA_ROOT)) {
-		LogString("Window is not a toplevel-window");
+		//LogString("Window is not a toplevel-window");
 		return false;
 	}
 
 	auto windowTitle = GetWindowTitle(hwnd);
 	if (windowTitle.compare(searchedWindowTitle) != 0) {
-		LogString("windowTitle='" + windowTitle + "' does not match '" WHATSAPP_CLIENT_NAME "'");
+		//LogString("windowTitle='" + windowTitle + "' does not match '" WHATSAPP_CLIENT_NAME "'");
 		return false;
 	}
 
