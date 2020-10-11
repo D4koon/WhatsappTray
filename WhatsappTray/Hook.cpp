@@ -73,6 +73,9 @@ static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam = 0, LPARAM lP
 static void TraceString(std::string traceString);
 static void TraceStream(std::ostringstream& traceBuffer);
 
+static void StartInitThread();
+static DWORD WINAPI Init(LPVOID lpParam);
+
 #define LogString(logString, ...) TraceString(MODULE_NAME + std::string("::") + std::string(__func__) + ": " + string_format(logString, __VA_ARGS__))
 
 /**
@@ -85,47 +88,8 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	switch (fdwReason)
 	{
 	case DLL_PROCESS_ATTACH: {
-		SocketStart(LOGGER_IP, LOGGER_PORT);
-
-		// Find the WhatsApp window-handle that we need to replace the window-proc
-		_processID = GetCurrentProcessId();
-
-		LogString("Attached hook.dll to ProcessID: 0x%08X", _processID);
-
-		auto filepath = GetFilepathFromProcessID(_processID);
-
-		/* LoadLibrary()triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
-		 * to prevent tirggering the wndProc redirect for WhatsappTray we need to detect if this happend.
-		 * the easiest/best way to detect that is by setting a enviroment variable before LoadLibrary() */
-		auto envValue = GetEnviromentVariable(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR);
-
-		LogString("Filepath: '%s' " WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR ": '%s'", filepath.c_str(), envValue.c_str());
-
-		if (envValue.compare(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE) == 0) {
-			LogString("Detected that this Attache was triggered by LoadLibrary() => Cancel further processing");
-
-			// It is best to remove the variable here so we can be sure it is not removed before it was detected.
-			// Delete enviroment-variable by setting it to "".
-			_putenv_s(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR, "");
-			break;
-		}
-
-		_whatsAppWindowHandle = GetTopLevelWindowhandleWithName(WHATSAPP_CLIENT_NAME);
-		auto windowTitle = GetWindowTitle(_whatsAppWindowHandle);
-
-		LogString("Attached in window '%s' _whatsAppWindowHandle: 0x%08X", windowTitle.c_str(), _whatsAppWindowHandle);
-
-		if (_whatsAppWindowHandle == NULL) {
-			LogString("Error, window-handle for '" WHATSAPP_CLIENT_NAME "' was not found");
-			break;
-		}
-
-		// Update the windows scaling for the monitor that whatsapp is currently on
-		UpdateDpi(_whatsAppWindowHandle);
-
-		// Replace the original window-proc with our own. This is called subclassing.
-		// Our window-proc will call after the processing the original window-proc.
-		_originalWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtr(_whatsAppWindowHandle, GWLP_WNDPROC, (LONG_PTR)RedirectedWndProc));
+		
+		StartInitThread();
 
 		break;
 	}
@@ -137,11 +101,65 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 			SetWindowLongPtr(_whatsAppWindowHandle, GWLP_WNDPROC, (LONG_PTR)_originalWndProc);
 		}
 
+		// NOTE: For some reason this works here. 
+		// Because according to this:https://docs.microsoft.com/en-ca/windows/win32/dlls/dynamic-link-library-best-practices?redirectedfrom=MSDN
+		// All threads should be terminated already?
+		// Anyway without stopping a messagebox with an error will appear.
 		SocketStop();
+
 	} break;
 	}
 
 	return true;
+}
+
+DWORD WINAPI Init(LPVOID lpParam)
+{
+	//OutputDebugStringA("Hook-init-thread is started");
+
+	SocketStart(LOGGER_IP, LOGGER_PORT);
+
+	// Find the WhatsApp window-handle that we need to replace the window-proc
+	_processID = GetCurrentProcessId();
+
+	LogString("Attached hook.dll to ProcessID: 0x%08X", _processID);
+
+	auto filepath = GetFilepathFromProcessID(_processID);
+
+	/* LoadLibrary()triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
+	 * to prevent tirggering the wndProc redirect for WhatsappTray we need to detect if this happend.
+	 * the easiest/best way to detect that is by setting a enviroment variable before LoadLibrary() */
+	auto envValue = GetEnviromentVariable(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR);
+
+	LogString("Filepath: '%s' " WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR ": '%s'", filepath.c_str(), envValue.c_str());
+
+	if (envValue.compare(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE) == 0) {
+		LogString("Detected that this Attache was triggered by LoadLibrary() => Cancel further processing");
+
+		// It is best to remove the variable here so we can be sure it is not removed before it was detected.
+		// Delete enviroment-variable by setting it to "".
+		_putenv_s(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR, "");
+		return 1;
+	}
+
+	_whatsAppWindowHandle = GetTopLevelWindowhandleWithName(WHATSAPP_CLIENT_NAME);
+	auto windowTitle = GetWindowTitle(_whatsAppWindowHandle);
+
+	LogString("Attached in window '%s' _whatsAppWindowHandle: 0x%08X", windowTitle.c_str(), _whatsAppWindowHandle);
+
+	if (_whatsAppWindowHandle == NULL) {
+		LogString("Error, window-handle for '" WHATSAPP_CLIENT_NAME "' was not found");
+		return 2;
+	}
+
+	// Update the windows scaling for the monitor that whatsapp is currently on
+	UpdateDpi(_whatsAppWindowHandle);
+
+	// Replace the original window-proc with our own. This is called subclassing.
+	// Our window-proc will call after the processing the original window-proc.
+	_originalWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtr(_whatsAppWindowHandle, GWLP_WNDPROC, (LONG_PTR)RedirectedWndProc));
+
+	return 0;
 }
 
 /**
@@ -192,6 +210,7 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 		SendMessageToWhatsappTray(WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE);
 
 		LogString("WM_CLOSE blocked.");
+
 		// Block WM_CLOSE
 		return 0;
 	} else if (uMsg == WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE) {
@@ -451,4 +470,33 @@ static void TraceStream(std::ostringstream& traceBuffer)
 //	traceBuffer.clear();
 //	traceBuffer.str(std::string());
 //#endif
+}
+
+/**
+ * @brief Starts the hook-init in an seperate thread
+ * 
+ * Because it is better to not use DllMain for more complex initialisaition, a seperate thread will be created in this function.
+ * NOTE: I had problems with '_processMessagesThread = std::thread(ProcessMessageQueue);' in WinSockClient, which would not run because of some limitations of DllMain
+ * IMPORTANT: Don't wait for the thread to finish! This should not be done in DllMain...
+*/
+void StartInitThread()
+{
+	DWORD   threadId;
+	HANDLE  threadHandle;
+
+	threadHandle = CreateThread(
+		NULL,                   // default security attributes
+		0,                      // use default stack size  
+		Init,       // thread function name
+		NULL,                   // argument to thread function 
+		0,                      // use default creation flags 
+		&threadId);   // returns the thread identifier 
+
+	// Check the return value for success.
+	if (threadHandle == NULL) {
+		//OutputDebugStringA("Thread could not be created in Hook init-function-starter");
+	}
+
+	// Close thread handle. NOTE(SAM): For now i do not clean up the thread handle because it shouldn't be such a big deal...
+	//CloseHandle(threadHandle);
 }

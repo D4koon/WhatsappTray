@@ -47,7 +47,7 @@ void SocketSendMessage(const char message[])
 /**
  * @brief Starts the client
 */
-bool SocketStart(const char ipString[], const char portString[])
+void SocketStart(const char ipString[], const char portString[])
 {
 	_ipString = ipString;
 	_portString = portString;
@@ -57,8 +57,6 @@ bool SocketStart(const char ipString[], const char portString[])
 	_isRunning = true;
 
 	_processMessagesThread = std::thread(ProcessMessageQueue);
-
-	return true;
 }
 
 void ProcessMessageQueue()
@@ -156,8 +154,7 @@ bool SocketSendMessage(const char ipString[], const char portString[], const cha
 	if (selRet == SOCKET_ERROR) {
 		LogDebug("Error occurred while using select() on socket.");
 		return false;
-	}
-	else if (selRet == 0) {
+	} else if (selRet == 0) {
 		LogDebug("Waiting for message timeout.");
 		return false;
 	}
@@ -261,7 +258,7 @@ void SocketStop(bool waitForEmptyBuffer, bool waitForShutdown)
 	// Send dummy-message to get out of wait_dequeue()
 	_messageBuffer.enqueue(std::string("end processing dummy-message. This should not be sent!"));
 
-	if (waitForShutdown) {
+	if (waitForShutdown && _processMessagesThread.joinable()) {
 		_processMessagesThread.join();
 	}
 }
