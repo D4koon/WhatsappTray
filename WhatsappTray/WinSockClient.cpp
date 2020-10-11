@@ -1,10 +1,12 @@
-// WinSockClient.cpp : Defines the entry point for the application.
+// WinSockClient implementation
 //
 
 #include "WinSockClient.h"
 
 #include <string.h>
 #include <winsock2.h>
+#include "../libs/readerwriterqueue/readerwriterqueue.h"
+#include "../libs/readerwriterqueue/atomicops.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -14,24 +16,99 @@
 // NOTE: For debugging OutputDebugStringA could be used...
 #define LogDebug(message, ...) //printf(MODULE_NAME "::" __FUNCTION__ " - " message "\n", __VA_ARGS__)
 
+static void ProcessMessageQueue();
+static bool SocketInit();
+static void SocketCleanup();
+static bool SocketSendMessage(const char ipString[], const char portString[], const char message[]);
 static bool SetupSocket();
 static bool CreateServerAddress(SOCKET clientSocket, const char ipString[], const char portString[], sockaddr_in& ServerAddress);
 static int WaitForNewMesaageWithTimeout(FD_SET& readSet, long sec, long usec);
 
+static bool _isRunning = false;
+static bool _waitForEmptyBuffer;
+static std::string _ipString;
+static std::string _portString;
+static std::thread _processMessagesThread;
+static moodycamel::BlockingReaderWriterQueue<std::string> _messageBuffer;
 static SOCKET clientSocket = INVALID_SOCKET;
+
+constexpr int timeoutReceiveSec = 10;
+
+/**
+ * @brief Sends message to server
+*/
+void SocketSendMessage(const char message[])
+{
+	if (_isRunning) {
+		_messageBuffer.enqueue(std::string(message));
+	}
+}
+
+/**
+ * @brief Starts the client
+*/
+bool SocketStart(const char ipString[], const char portString[])
+{
+	_ipString = ipString;
+	_portString = portString;
+
+	LogDebug("Start message-processing thread");
+
+	_isRunning = true;
+
+	_processMessagesThread = std::thread(ProcessMessageQueue);
+
+	return true;
+}
+
+void ProcessMessageQueue()
+{
+	SocketInit();
+
+	std::string item;
+	while (true) {
+		_messageBuffer.wait_dequeue(item);
+
+		if (_isRunning == false) {
+			break;
+		}
+
+		SocketSendMessage(_ipString.c_str(), _portString.c_str(), item.c_str());
+	}
+
+	if (_waitForEmptyBuffer) {
+		// Empty the buffer before stopping.
+
+		// One item should be still in item that was not processed yet.
+		// If it was the dummy, do nothing.
+
+		while (true) {
+
+			if (_messageBuffer.size_approx() == 0) {
+				break;
+			}
+
+			SocketSendMessage(_ipString.c_str(), _portString.c_str(), item.c_str());
+
+			_messageBuffer.try_dequeue(item);
+		}
+
+	}
+
+	SocketCleanup();
+}
 
 bool SocketInit()
 {
-	// Initialize Winsock
 	WSADATA wsaData;
 	int nResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
 	if (NO_ERROR != nResult) {
-		LogDebug("Error occurred while executing WSAStartup().");
+		LogDebug("Error occurred while executing WSAStartup()");
 		return false;
 	}
 
-	LogDebug("WSAStartup() successful.");
+	LogDebug("WSAStartup() successful");
 
 	return true;
 }
@@ -49,7 +126,6 @@ void SocketCleanup()
 bool SocketSendMessage(const char ipString[], const char portString[], const char message[])
 {
 	if (SetupSocket() == false) {
-		LogDebug("Error occurred while SetupSocket()");
 		closesocket(clientSocket);
 	}
 
@@ -76,7 +152,7 @@ bool SocketSendMessage(const char ipString[], const char portString[], const cha
 
 	FD_SET readSet;
 	// NOTE: selRet has the cout of sockets that are ready
-	auto selRet = WaitForNewMesaageWithTimeout(readSet, 10, 0);
+	auto selRet = WaitForNewMesaageWithTimeout(readSet, timeoutReceiveSec, 0);
 	if (selRet == SOCKET_ERROR) {
 		LogDebug("Error occurred while using select() on socket.");
 		return false;
@@ -172,4 +248,20 @@ static int WaitForNewMesaageWithTimeout(FD_SET& readSet, long sec, long usec)
 	auto selRet = select(NULL, &readSet, NULL, NULL, &timeoutTime);
 
 	return selRet;
+}
+
+/**
+ * @brief Stops the client
+*/
+void SocketStop(bool waitForEmptyBuffer, bool waitForShutdown)
+{
+	_waitForEmptyBuffer = waitForEmptyBuffer;
+	_isRunning = false;
+
+	// Send dummy-message to get out of wait_dequeue()
+	_messageBuffer.enqueue(std::string("end processing dummy-message. This should not be sent!"));
+
+	if (waitForShutdown) {
+		_processMessagesThread.join();
+	}
 }

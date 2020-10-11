@@ -85,7 +85,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	switch (fdwReason)
 	{
 	case DLL_PROCESS_ATTACH: {
-		SocketInit();
+		SocketStart(LOGGER_IP, LOGGER_PORT);
 
 		// Find the WhatsApp window-handle that we need to replace the window-proc
 		_processID = GetCurrentProcessId();
@@ -137,7 +137,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 			SetWindowLongPtr(_whatsAppWindowHandle, GWLP_WNDPROC, (LONG_PTR)_originalWndProc);
 		}
 
-		SocketCleanup();
+		SocketStop();
 	} break;
 	}
 
@@ -433,7 +433,7 @@ static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam, LPARAM lParam
 
 static void TraceString(std::string traceString)
 {
-	SocketSendMessage(LOGGER_IP, LOGGER_PORT, traceString.c_str());
+	SocketSendMessage(traceString.c_str());
 
 //#ifdef _DEBUG
 //	OutputDebugStringA(traceString.c_str());
@@ -442,7 +442,7 @@ static void TraceString(std::string traceString)
 
 static void TraceStream(std::ostringstream& traceBuffer)
 {
-	SocketSendMessage(LOGGER_IP, LOGGER_PORT, traceBuffer.str().c_str());
+	SocketSendMessage(traceBuffer.str().c_str());
 	traceBuffer.clear();
 	traceBuffer.str(std::string());
 

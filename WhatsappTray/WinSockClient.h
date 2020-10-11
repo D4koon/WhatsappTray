@@ -1,10 +1,11 @@
-// WinSockClient.h : Include file for standard system include files,
-// or project specific include files.
+// WinSockClient header
+//
 
 #pragma once
 
 #include <iostream>
+#include <thread>
 
-bool SocketInit();
-void SocketCleanup();
-bool SocketSendMessage(const char ipString[], const char portString[], const char message[]);
+void SocketSendMessage(const char message[]);
+bool SocketStart(const char ipString[], const char portString[]);
+void SocketStop(bool waitForEmptyBuffer = true, bool waitForShutdown = true);
