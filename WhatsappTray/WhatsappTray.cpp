@@ -208,8 +208,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 
 		if (AppData::CloseToTray.Get() == true) {
 			Logger::Info(MODULE_NAME "::WndProc() - Close to tray is true => Minimize WhatsApp to taskbar.");
-		}
-		else {
+		} else {
 			Logger::Info(MODULE_NAME "::WndProc() - Close to tray is false => Minimize WhatsApp to tray.");
 			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 		}
@@ -220,10 +219,17 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		if (AppData::CloseToTray.Get() == true) {
 			Logger::Info(MODULE_NAME "::WndProc() - Close to tray is true => Minimize WhatsApp to tray.");
 			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
-		}
-		else {
+		} else {
 			Logger::Info(MODULE_NAME "::WndProc() - Close to tray is false => Close WhatsApp and WhatsappTray.");
 			_trayManager->CloseWindowFromTray(_hwndWhatsapp);
+		}
+	} break;
+	case WM_WA_KEY_PRESSED: {
+		Logger::Info(MODULE_NAME "::WndProc() - WM_WA_KEY_PRESSED wParam=%d", wParam);
+
+		if (wParam == 27) {
+			// Esc-key was pressed
+			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 		}
 	} break;
 	case WM_WHAHTSAPP_CLOSING: {

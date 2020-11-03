@@ -33,6 +33,7 @@
 
 #define WM_WA_MINIMIZE_BUTTON_PRESSED  0x0401 /* The minimize-button in WhatsApp was pressed */
 #define WM_WA_CLOSE_BUTTON_PRESSED  0x0402 /* The close-button in WhatsApp was pressed (X) */
+#define WM_WA_KEY_PRESSED  0x0403 /* A key in WhatsApp was pressed (X) */
 #define WM_TRAYCMD  0x0404
 #define WM_WHAHTSAPP_CLOSING  0x0405
 #define WM_REAPPLY_HOOK  0x0406

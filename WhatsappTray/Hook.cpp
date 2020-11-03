@@ -171,8 +171,8 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 
 		traceBuffer << MODULE_NAME << "::" << __func__ << ": " << WindowsMessage::GetString(uMsg) << "(0x" << std::uppercase << std::hex << uMsg << ") ";
 		traceBuffer << "windowTitle='" << GetWindowTitle(hwnd) << "' ";
-		traceBuffer << "hwnd='" << std::uppercase << std::hex << hwnd << "' ";
-		traceBuffer << "wParam='" << std::uppercase << std::hex << wParam << "' ";
+		traceBuffer << "hwnd=0x'" << std::uppercase << std::hex << hwnd << "' ";
+		traceBuffer << "wParam=0x'" << std::uppercase << std::hex << wParam << "' ";
 		TraceStream(traceBuffer);
 	}
 #endif
@@ -251,6 +251,10 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 			LogString("Block WM_LBUTTONUP");
 			return 0;
 		}
+	} else if (uMsg == WM_KEYUP) {
+		LogString("WM_KEYUP received key=%d", wParam);
+
+		SendMessageToWhatsappTray(WM_WA_KEY_PRESSED, wParam, lParam);
 	}
 
 	// Call the original window-proc.
