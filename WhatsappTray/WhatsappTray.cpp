@@ -442,6 +442,9 @@ static HWND FindWhatsapp()
 		auto windowTitle = Helper::GetWindowTitle(iteratedHwnd);
 		Logger::Info(MODULE_NAME "::FindWhatsapp() - Found window with title: '%s' hwnd=0x%08X", windowTitle.c_str(), reinterpret_cast<uintptr_t>(iteratedHwnd));
 
+		// It looks like as if the 'Whatsapp Voip'-window is first named 'Whatsapp' when Whatsapp is started and then changed shortly after to 'Whatsapp Voip'.
+		// Because of that it can happen that the wrong window is set.
+		// To prevent that it is checked if the window is visible because 'Whatsapp Voip'-window seems to be always hidden. NOTE: I Could also always check the window later before i use it...
 		if (IsWindowVisible(iteratedHwnd) == false) {
 			continue;
 		}
