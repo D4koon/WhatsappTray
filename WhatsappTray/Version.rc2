@@ -7,8 +7,8 @@
 
 #define MAJOR 1
 #define MINOR 6
-#define PATCH 1
-#define IS_DEBUG 1
+#define PATCH 2
+#define IS_DEBUG 0
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
