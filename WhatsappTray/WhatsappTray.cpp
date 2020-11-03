@@ -151,7 +151,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 #pragma WARNING(Move into TrayManager. Problem is executeMenue...)
 		switch (static_cast<UINT>(lParam)) {
 		case NIN_SELECT: {
-			_trayManager->RestoreWindowFromTray(_hwndWhatsapp);
+			if (IsWindowVisible(_hwndWhatsapp) == false) {
+				_trayManager->RestoreWindowFromTray(_hwndWhatsapp);
+			} else {
+				_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
+			}
 		} break;
 		case WM_CONTEXTMENU: {
 			ExecuteMenu();

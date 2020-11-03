@@ -152,6 +152,7 @@ void TrayManager::RestoreAllWindowsFromTray()
 
 void TrayManager::RestoreWindowFromTray(const HWND hwnd)
 {
+	// Checking if the window is visible prevents the window from being reduced to windowed when the window is maximized and already showen.
 	if (IsWindowVisible(hwnd) == false) {
 		ShowWindow(hwnd, SW_RESTORE);
 		SetForegroundWindow(hwnd);
