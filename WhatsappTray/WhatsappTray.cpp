@@ -50,7 +50,6 @@ constexpr auto CompileConfiguration = "Release";
 
 static HINSTANCE _hInstance = NULL;
 static HWND _hwndWhatsappTray = NULL;
-static HWND _hwndForMenu = NULL;
 static HWND _hwndWhatsapp = NULL;
 
 static HHOOK _hWndProc = NULL;
@@ -145,6 +144,20 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 			DestroyWindow(_hwndWhatsappTray);
 		}
 	} break;
+	case WM_CLOSE: {
+		DestroyWindow(_hwndWhatsappTray);
+	} break;
+	case WM_TRAYCMD: {
+#pragma WARNING(Move into TrayManager. Problem is executeMenue...)
+		switch (static_cast<UINT>(lParam)) {
+		case NIN_SELECT: {
+			_trayManager->RestoreWindowFromTray(_hwndWhatsapp);
+		} break;
+		case WM_CONTEXTMENU: {
+			ExecuteMenu();
+		} break;
+		}
+	} break;
 	case WM_COMMAND: {
 		switch (LOWORD(wParam)) {
 		case IDM_ABOUT: {
@@ -171,10 +184,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		} break;
 		case IDM_RESTORE: {
 			Logger::Info(MODULE_NAME "::WndProc() - IDM_RESTORE");
-			_trayManager->RestoreWindowFromTray(_hwndForMenu);
+			_trayManager->RestoreWindowFromTray(_hwndWhatsapp);
 		} break;
 		case IDM_CLOSE: {
-			_trayManager->CloseWindowFromTray(_hwndForMenu);
+			_trayManager->CloseWindowFromTray(_hwndWhatsapp);
 
 			// Running WhatsappTray without Whatsapp makes no sence because if a new instance of Whatsapp is started, WhatsappTray would not hook it. Atleast not in the current implementation...
 			DestroyWindow(_hwndWhatsappTray);
@@ -209,18 +222,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 			_trayManager->CloseWindowFromTray(_hwndWhatsapp);
 		}
 	} break;
-	case WM_TRAYCMD: {
-#pragma WARNING(Move into TrayManager. Problem is executeMenue...)
-		switch (static_cast<UINT>(lParam)) {
-		case NIN_SELECT: {
-			_trayManager->RestoreFromTray(wParam);
-		} break;
-		case WM_CONTEXTMENU: {
-			_hwndForMenu = _trayManager->GetHwndFromIndex(wParam);
-			ExecuteMenu();
-		} break;
-		}
-	}break;
 	case WM_WHAHTSAPP_CLOSING: {
 		// If Whatsapp is closing we want to close WhatsappTray as well.
 		Logger::Info(MODULE_NAME "::WndProc() - WM_WHAHTSAPP_CLOSING");
@@ -279,7 +280,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 	default: {
 		if (msg == s_uTaskbarRestart) {
 			_trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
-			_trayManager->AddWindowToTray(_hwndWhatsapp);
+			_trayManager->RegisterWindow(_hwndWhatsapp);
 		}
 	} break;
 	}
@@ -325,7 +326,7 @@ static bool InitWhatsappTray()
 		return false;
 	}
 
-	_trayManager->AddWindowToTray(_hwndWhatsapp);
+	_trayManager->RegisterWindow(_hwndWhatsapp);
 
 	if (SetHook() == false) {
 		Logger::Error(MODULE_NAME "::WinMain() - Error setting hook.");
@@ -572,7 +573,7 @@ static void ExecuteMenu()
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_START_MINIMIZED, "Start minimized");
 	}
 
-	// -- Start minimized.
+	// -- Show unread messages.
 	if (AppData::ShowUnreadMessages.Get()) {
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages (experimental)");
 	} else {

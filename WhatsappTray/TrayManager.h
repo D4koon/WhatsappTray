@@ -30,19 +30,16 @@
 class TrayManager
 {
 public:
-	TrayManager(HWND _hwndWhatsappTray);
+	TrayManager(const HWND hwndWhatsappTray);
 	~TrayManager() { }
-	void MinimizeWindowToTray(HWND hwnd);
-	void CloseWindowFromTray(HWND hwnd);
-	void RemoveTrayIcon(HWND hwnd);
-	void RemoveFromTray(int32_t index);
+	void MinimizeWindowToTray(const HWND hwnd);
+	void CloseWindowFromTray(const HWND hwnd);
+	void RemoveTrayIcon(const HWND hwnd);
+	void RemoveFromTray(const int32_t index);
 	void RestoreAllWindowsFromTray();
-	void RestoreFromTray(uintptr_t index);
-	void RestoreWindowFromTray(HWND hwnd);
-	void RefreshWindowInTray(HWND hwnd);
-	void SetIcon(HWND hwnd, LPCSTR text);
-	HWND GetHwndFromIndex(uintptr_t index);
-	void AddWindowToTray(HWND hwnd);
+	void RestoreWindowFromTray(const HWND hwnd);
+	void SetIcon(const HWND hwnd, LPCSTR text);
+	void RegisterWindow(const HWND hwnd);
 private:
 	static const int MAXTRAYITEMS = 64;
 
@@ -50,8 +47,8 @@ private:
 	HWND _hwndWhatsappTray;
 	HWND _hwndItems[MAXTRAYITEMS];
 
-	void CreateTrayIcon(int32_t index, HWND hwnd);
-	int32_t GetIndexFromWindowHandle(HWND hwnd);
+	void CreateTrayIcon(const int32_t index, const HWND hwnd);
+	int32_t GetIndexFromWindowHandle(const HWND hwnd);
 	HICON AddTextToIcon(HICON hBackgroundIcon, LPCSTR text);
 };
 

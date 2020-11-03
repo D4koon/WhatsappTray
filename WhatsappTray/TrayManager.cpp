@@ -32,25 +32,16 @@ using namespace Gdiplus;
 #undef MODULE_NAME
 #define MODULE_NAME "TrayManager::"
 
-TrayManager::TrayManager(HWND _hwndWhatsappTray)
-	: _hwndWhatsappTray(_hwndWhatsappTray)
+TrayManager::TrayManager(const HWND hwndWhatsappTray)
+	: _hwndWhatsappTray(hwndWhatsappTray)
 	, _hwndItems { 0 }
 {
 	Logger::Info(MODULE_NAME "ctor() - Creating TrayManger.");
 }
 
-void TrayManager::MinimizeWindowToTray(HWND hwnd)
+void TrayManager::MinimizeWindowToTray(const HWND hwnd)
 {
 	Logger::Info(MODULE_NAME "MinimizeWindowToTray(0x%08X)", reinterpret_cast<uintptr_t>(hwnd));
-
-	// Don't minimize MDI child windows
-	if ((UINT)GetWindowLongPtr(hwnd, GWL_EXSTYLE) & WS_EX_MDICHILD) return;
-
-	// If hwnd is a child window, find parent window (e.g. minimize button in
-	// Office 2007 (ribbon interface) is in a child window)
-	if ((UINT)GetWindowLongPtr(hwnd, GWL_STYLE) & WS_CHILD) {
-		hwnd = GetAncestor(hwnd, GA_ROOT);
-	}
 
 	// Hide window
 	// NOTE: The SW_MINIMIZE is important for the case when close-to-tray-feature is used:
@@ -64,11 +55,11 @@ void TrayManager::MinimizeWindowToTray(HWND hwnd)
 /**
  * If a window is already in the tray nothing will be done.
  */
-void TrayManager::AddWindowToTray(HWND hwnd)
+void TrayManager::RegisterWindow(const HWND hwnd)
 {
 	// Add icon to tray if it's not already there
 	if (GetIndexFromWindowHandle(hwnd) != -1) {
-		Logger::Warning(MODULE_NAME "AddWindowToTray() - Trying to send a window to tray that should already be minimized. This should not happen.");
+		Logger::Warning(MODULE_NAME "RegisterWindow() - Trying to send a window to tray that should already be minimized. This should not happen.");
 		return;
 	}
 
@@ -81,14 +72,14 @@ void TrayManager::AddWindowToTray(HWND hwnd)
 	}
 
 	if (newIndex == -1) {
-		Logger::Error(MODULE_NAME "AddWindowToTray() - Tray is full!");
+		Logger::Error(MODULE_NAME "RegisterWindow() - Tray is full!");
 	}
 
 	_hwndItems[newIndex] = hwnd;
 	CreateTrayIcon(newIndex, hwnd);
 }
 
-void TrayManager::CreateTrayIcon(int32_t index, HWND hwnd)
+void TrayManager::CreateTrayIcon(const int32_t index, const HWND hwnd)
 {
 	Logger::Info(MODULE_NAME "CreateTrayIcon(%d)", index);
 
@@ -100,13 +91,15 @@ void TrayManager::CreateTrayIcon(int32_t index, HWND hwnd)
 	nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
 	nid.uCallbackMessage = WM_TRAYCMD;
 	nid.hIcon = Helper::GetWindowIcon(hwnd);
+
 	GetWindowText(hwnd, nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
+
 	nid.uVersion = NOTIFYICON_VERSION;
 	Shell_NotifyIcon(NIM_ADD, &nid);
 	Shell_NotifyIcon(NIM_SETVERSION, &nid);
 }
 
-void TrayManager::CloseWindowFromTray(HWND hwnd)
+void TrayManager::CloseWindowFromTray(const HWND hwnd)
 {
 	Logger::Info(MODULE_NAME "CloseWindowFromTray() x%08X", hwnd);
 
@@ -125,14 +118,14 @@ void TrayManager::CloseWindowFromTray(HWND hwnd)
 	}
 }
 
-void TrayManager::RemoveTrayIcon(HWND hwnd)
+void TrayManager::RemoveTrayIcon(const HWND hwnd)
 {
 	int32_t index = GetIndexFromWindowHandle(hwnd);
 	if (index == -1) { return; }
 	RemoveFromTray(index);
 }
 
-void TrayManager::RemoveFromTray(int32_t index)
+void TrayManager::RemoveFromTray(const int32_t index)
 {
 	Logger::Info(MODULE_NAME "RemoveFromTray(%d)", index);
 
@@ -141,52 +134,31 @@ void TrayManager::RemoveFromTray(int32_t index)
 	nid.cbSize = NOTIFYICONDATA_V2_SIZE;
 	nid.hWnd = _hwndWhatsappTray;
 	nid.uID = (UINT)index;
+
 	Shell_NotifyIcon(NIM_DELETE, &nid);
+
 	_hwndItems[index] = NULL;
 }
 
 void TrayManager::RestoreAllWindowsFromTray()
 {
 	for (int i = 0; i < MAXTRAYITEMS; i++) {
-		if (_hwndItems[i]) {
-			RestoreFromTray(i);
+		HWND itHwnd = _hwndItems[i];
+		if (itHwnd) {
+			RestoreWindowFromTray(itHwnd);
 		}
 	}
 }
 
-void TrayManager::RestoreFromTray(uintptr_t index)
+void TrayManager::RestoreWindowFromTray(const HWND hwnd)
 {
-	HWND hwnd = GetHwndFromIndex(index);
-	RestoreWindowFromTray(hwnd);
-}
-
-void TrayManager::RestoreWindowFromTray(HWND hwnd)
-{
-	ShowWindow(hwnd, SW_RESTORE);
-	SetForegroundWindow(hwnd);
-}
-
-void TrayManager::RefreshWindowInTray(HWND hwnd)
-{
-	int32_t index = GetIndexFromWindowHandle(hwnd);
-	if (index == -1) {
-		return;
-	}
-	if (!IsWindow(hwnd) || IsWindowVisible(hwnd)) {
-		RemoveFromTray(index);
-	} else {
-		NOTIFYICONDATA nid;
-		ZeroMemory(&nid, sizeof(nid));
-		nid.cbSize = NOTIFYICONDATA_V2_SIZE;
-		nid.hWnd = _hwndWhatsappTray;
-		nid.uID = static_cast<UINT>(index);
-		nid.uFlags = NIF_TIP;
-		GetWindowText(hwnd, nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
-		Shell_NotifyIcon(NIM_MODIFY, &nid);
+	if (IsWindowVisible(hwnd) == false) {
+		ShowWindow(hwnd, SW_RESTORE);
+		SetForegroundWindow(hwnd);
 	}
 }
 
-void TrayManager::SetIcon(HWND hwnd, LPCSTR text)
+void TrayManager::SetIcon(const HWND hwnd, LPCSTR text)
 {
 	int32_t index = GetIndexFromWindowHandle(hwnd);
 	if (index == -1) {
@@ -212,21 +184,18 @@ void TrayManager::SetIcon(HWND hwnd, LPCSTR text)
 	::DestroyIcon(iconWithText);
 }
 
-HWND TrayManager::GetHwndFromIndex(uintptr_t index)
-{
-	return _hwndItems[index];
-}
-
-int32_t TrayManager::GetIndexFromWindowHandle(HWND hwnd)
+int32_t TrayManager::GetIndexFromWindowHandle(const HWND hwnd)
 {
 	if (hwnd == NULL) {
 		return -1;
 	}
+
 	for (int i = 0; i < MAXTRAYITEMS; i++) {
 		if (_hwndItems[i] == hwnd) {
 			return i;
 		}
 	}
+
 	return -1;
 }
 
