@@ -366,3 +366,14 @@ std::string Helper::GetFilepathFromProcessID(DWORD processId)
 
 	return Helper::WideToUtf8(filepath);
 }
+
+/**
+ * @brief Gets the text of a window.
+ */
+std::string Helper::GetWindowTitle(const HWND hwnd)
+{
+	char windowNameBuffer[2000];
+	GetWindowTextA(hwnd, windowNameBuffer, sizeof(windowNameBuffer));
+
+	return std::string(windowNameBuffer);
+}

@@ -65,7 +65,7 @@ static std::unique_ptr<TrayManager> _trayManager;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd);
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-static void InitWhatsappTray();
+static bool InitWhatsappTray();
 static HWND StartWhatsapp();
 static HWND FindWhatsapp();
 static void TryClosePreviousWhatsappTrayInstance();
@@ -141,7 +141,9 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		// See default case for handling of this message
 		s_uTaskbarRestart = RegisterWindowMessage(TEXT("TaskbarCreated"));
 
-		InitWhatsappTray();
+		if (InitWhatsappTray() == false) {
+			DestroyWindow(_hwndWhatsappTray);
+		}
 	} break;
 	case WM_COMMAND: {
 		switch (LOWORD(wParam)) {
@@ -288,7 +290,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 /**
  * @brief Initializes WhatsappTray
 */
-static void InitWhatsappTray()
+static bool InitWhatsappTray()
 {
 	// Setup the settings for launch on windows startup.
 	SetLaunchOnWindowsStartupSetting(AppData::LaunchOnWindowsStartup.Get());
@@ -312,7 +314,7 @@ static void InitWhatsappTray()
 	if (!(_hLib = LoadLibrary("Hook.dll"))) {
 		Logger::Error(MODULE_NAME "::WinMain() - Error loading Hook.dll.");
 		MessageBox(NULL, "Error loading Hook.dll.", "WhatsappTray", MB_OK | MB_ICONERROR);
-		return;
+		return false;
 	}
 
 	// TrayManager needs to be ready before WhatsApp is started to handle 'start minimized'
@@ -320,18 +322,20 @@ static void InitWhatsappTray()
 
 	if (StartWhatsapp() == nullptr) {
 		MessageBoxA(NULL, "Error launching WhatsApp. Examine the logs for details", "WhatsappTray", MB_OK);
-		return;
+		return false;
 	}
 
 	_trayManager->AddWindowToTray(_hwndWhatsapp);
 
 	if (SetHook() == false) {
 		Logger::Error(MODULE_NAME "::WinMain() - Error setting hook.");
-		return;
+		return false;
 	}
 
 	// Send a WM_WHATSAPP_API_NEW_MESSAGE-message when a new WhatsApp-message has arrived.
 	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_WHATSAPP_API_NEW_MESSAGE, 0, 0); });
+
+	return true;
 }
 
 /**
@@ -428,15 +432,27 @@ static HWND StartWhatsapp()
  */
 static HWND FindWhatsapp()
 {
-	HWND currentWindow = NULL;
+	HWND iteratedHwnd = NULL;
 	while (true) {
-		currentWindow = FindWindowExA(NULL, currentWindow, NULL, WHATSAPP_CLIENT_NAME);
-		if (currentWindow == NULL) {
+		iteratedHwnd = FindWindowExA(NULL, iteratedHwnd, NULL, WHATSAPP_CLIENT_NAME);
+		if (iteratedHwnd == NULL) {
 			return NULL;
 		}
 
+		auto windowTitle = Helper::GetWindowTitle(iteratedHwnd);
+		Logger::Info(MODULE_NAME "::FindWhatsapp() - Found window with title: '%s' hwnd=0x%08X", windowTitle.c_str(), reinterpret_cast<uintptr_t>(iteratedHwnd));
+
+		if (IsWindowVisible(iteratedHwnd) == false) {
+			continue;
+		}
+
+		// Also check length because compare also matches strings that are longer like 'WhatsApp Voip'
+		if (windowTitle.compare(WHATSAPP_CLIENT_NAME) != 0 && windowTitle.length() == strlen(WHATSAPP_CLIENT_NAME)) {
+			continue;
+		}
+
 		DWORD processId;
-		DWORD threadId = GetWindowThreadProcessId(currentWindow, &processId);
+		DWORD threadId = GetWindowThreadProcessId(iteratedHwnd, &processId);
 
 		auto filepath = Helper::GetFilepathFromProcessID(processId);
 
@@ -453,11 +469,11 @@ static HWND FindWhatsapp()
 			continue;
 		}
 
-		Logger::Info(MODULE_NAME "::FindWhatsapp() - Found match.");
+		Logger::Info(MODULE_NAME "::FindWhatsapp() - Found match");
 		break;
 	}
 
-	return currentWindow;
+	return iteratedHwnd;
 }
 
 /**

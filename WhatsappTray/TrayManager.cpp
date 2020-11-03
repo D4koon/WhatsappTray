@@ -41,7 +41,7 @@ TrayManager::TrayManager(HWND _hwndWhatsappTray)
 
 void TrayManager::MinimizeWindowToTray(HWND hwnd)
 {
-	Logger::Info(MODULE_NAME "MinimizeWindowToTray(0x%llX)", reinterpret_cast<uintptr_t>(hwnd));
+	Logger::Info(MODULE_NAME "MinimizeWindowToTray(0x%08X)", reinterpret_cast<uintptr_t>(hwnd));
 
 	// Don't minimize MDI child windows
 	if ((UINT)GetWindowLongPtr(hwnd, GWL_EXSTYLE) & WS_EX_MDICHILD) return;

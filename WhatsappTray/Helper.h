@@ -50,5 +50,6 @@ public:
 	static std::wstring GetFilenameFromPath(std::wstring path);
 	static std::string ResolveLnk(HWND hwnd, LPCSTR lpszLinkFile);
 	static std::string GetFilepathFromProcessID(DWORD processId);
+	static std::string GetWindowTitle(const HWND hwnd);
 };
 

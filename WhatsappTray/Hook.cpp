@@ -49,9 +49,6 @@ static DWORD _processID = NULL;
 static HWND _whatsAppWindowHandle = NULL;
 static WNDPROC _originalWndProc = NULL;
 
-static HWND _tempWindowHandle = NULL; /* For GetTopLevelWindowhandleWithName() */
-static std::string _searchedWindowTitle; /* For GetTopLevelWindowhandleWithName() */
-
 static UINT _dpiX; /* The horizontal dpi-size. Is set in Windows settings. Default 100% = 96 */
 static UINT _dpiY; /* The vertical dpi-size. Is set in Windows settings. Default 100% = 96 */
 
@@ -61,9 +58,6 @@ static void UpdateDpi(HWND hwnd);
 // NOTE: extern "C" is important to disable name-mangling, so that the functions can be found with GetProcAddress(), which is used in WhatsappTray.cpp
 extern "C" DLLIMPORT LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam); 
 static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle);
-static BOOL CALLBACK FindTopLevelWindowhandleWithNameCallback(HWND hwnd, LPARAM lParam);
-static bool WindowhandleIsToplevelWithTitle(HWND hwnd, std::string searchedWindowTitle);
-static bool IsTopLevelWhatsApp(HWND hwnd);
 static std::string GetWindowTitle(HWND hwnd);
 static std::string GetFilepathFromProcessID(DWORD processId);
 static std::string WideToUtf8(const std::wstring& inputString);
@@ -94,7 +88,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		break;
 	}
 	case DLL_PROCESS_DETACH: {
-		LogString("Detach hook.dll from ProcessID: 0x%08X",_processID);
+		LogString("Detach hook.dll from ProcessID: 0x%08X", _processID);
 
 		// Remove our window-proc from the chain by setting the original window-proc.
 		if (_originalWndProc != NULL) {
@@ -189,14 +183,14 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 			LogString("SC_MINIMIZE received");
 
 			// Here i check if the windowtitle matches. Vorher hatte ich das Problem das sich Chrome auch minimiert hat.
-			if (IsTopLevelWhatsApp(hwnd)) {
+			if (hwnd == _whatsAppWindowHandle) {
 				SendMessageToWhatsappTray(WM_WA_MINIMIZE_BUTTON_PRESSED);
 			}
 		}
 	} else if (uMsg == WM_NCDESTROY) {
 		LogString("WM_NCDESTROY received");
 
-		if (IsTopLevelWhatsApp(hwnd)) {
+		if (hwnd == _whatsAppWindowHandle) {
 			auto successfulSent = SendMessageToWhatsappTray(WM_WHAHTSAPP_CLOSING);
 			if (successfulSent) {
 				LogString("WM_WHAHTSAPP_CLOSING successful sent.");
@@ -315,71 +309,41 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 */
 static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle)
 {
-	_tempWindowHandle = NULL;
-
-	_searchedWindowTitle = searchedWindowTitle;
-	EnumWindows(FindTopLevelWindowhandleWithNameCallback, NULL);
-
-	return _tempWindowHandle;
-}
-
-/**
- * @brief Search the window-handle for the current process
- *
- * Be carefull, one process can have multiple windows.
- * Thats why the window-title also gets checked.
- */
-static BOOL CALLBACK FindTopLevelWindowhandleWithNameCallback(HWND hwnd, LPARAM lParam)
-{
-	DWORD processId;
-	auto result = GetWindowThreadProcessId(hwnd, &processId);
-
-	// Check processId and Title
-	// Already observerd an instance where the processId alone lead to an false match!
-	if (_processID == processId) {
-		// Found the matching processId
-
-		if (WindowhandleIsToplevelWithTitle(hwnd, _searchedWindowTitle)) {
-			// The window is the root-window
-
-			_tempWindowHandle = hwnd;
-
-			// Stop enumeration
-			return false;
+	HWND iteratedHwnd = NULL;
+	while (true) {
+		iteratedHwnd = FindWindowExA(NULL, iteratedHwnd, NULL, WHATSAPP_CLIENT_NAME);
+		if (iteratedHwnd == NULL) {
+			return NULL;
 		}
+
+		DWORD processId;
+		DWORD threadId = GetWindowThreadProcessId(iteratedHwnd, &processId);
+
+		// Check processId and Title
+		// Already observerd an instance where the processId alone lead to an false match!
+		if (_processID != processId) {
+			// processId does not match -> continue looking
+			continue;
+		}
+		// Found matching processId
+
+		if (iteratedHwnd != GetAncestor(iteratedHwnd, GA_ROOT)) {
+			//LogString("Window is not a toplevel-window");
+			continue;
+		}
+
+		auto windowTitle = GetWindowTitle(iteratedHwnd);
+		// Also check length because compare also matches strings that are longer like 'WhatsApp Voip'
+		if (windowTitle.compare(searchedWindowTitle) != 0 || windowTitle.length() != strlen(WHATSAPP_CLIENT_NAME)) {
+			//LogString("windowTitle='" + windowTitle + "' does not match '" WHATSAPP_CLIENT_NAME "'");
+			continue;
+		}
+
+		// Window handle found
+		break;
 	}
 
-	// Continue enumeration
-	return true;
-}
-
-/**
- * @brief Returns true if the window-handle and the title match
- */
-static bool WindowhandleIsToplevelWithTitle(HWND hwnd, std::string searchedWindowTitle)
-{
-	if (hwnd != GetAncestor(hwnd, GA_ROOT)) {
-		//LogString("Window is not a toplevel-window");
-		return false;
-	}
-
-	auto windowTitle = GetWindowTitle(hwnd);
-	if (windowTitle.compare(searchedWindowTitle) != 0) {
-		//LogString("windowTitle='" + windowTitle + "' does not match '" WHATSAPP_CLIENT_NAME "'");
-		return false;
-	}
-
-	return true;
-}
-
-/**
- * To verify that we found the correct window:
- * 1. Check if its a toplevel-window (below desktop)
- * 2. Match the window-name with whatsapp.
- */
-static bool IsTopLevelWhatsApp(HWND hwnd)
-{
-	return WindowhandleIsToplevelWithTitle(hwnd, WHATSAPP_CLIENT_NAME);
+	return iteratedHwnd;
 }
 
 /**
