@@ -13,12 +13,18 @@
     <ClCompile Include="WinSockClient.cpp">
       <Filter>Files</Filter>
     </ClCompile>
+    <ClCompile Include="WinSockLogger.cpp">
+      <Filter>Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SharedDefines.h">
       <Filter>Files</Filter>
     </ClInclude>
     <ClInclude Include="WinSockClient.h">
+      <Filter>Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WinSockLogger.h">
       <Filter>Files</Filter>
     </ClInclude>
   </ItemGroup>

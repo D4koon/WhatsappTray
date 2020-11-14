@@ -1,5 +1,5 @@
-// WinSockServer.h : Include file for standard system include files,
-// or project specific include files.
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright(C) 2020 - 2020 WhatsappTray Sebastian Amann */
 
 #pragma once
 

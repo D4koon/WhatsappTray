@@ -1,31 +1,13 @@
-/*
-*
-* WhatsappTray
-* Copyright (C) 1998-2017  Sebastian Amann, Nikolay Redko, J.D. Purcell
-*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation; either version 2 of the License, or
-* (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-*
-*/
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright(C) 1998 - 2017 WhatsappTray Sebastian Amann */
 
 #include "SharedDefines.h"
 #include "WindowsMessage.h"
-#include "WinSockClient.h"
+#include "WinSockLogger.h"
 
-#include <windows.h>
 #include <iostream>
 #include <sstream>
+#include <windows.h>
 #include <psapi.h> // OpenProcess()
 //#include <shellscalingapi.h> // For dpi-scaling stuff
 
@@ -75,12 +57,8 @@ static std::string WideToUtf8(const std::wstring& inputString);
 static std::string GetEnviromentVariable(const std::string& inputString);
 static POINT LParamToPoint(LPARAM lParam);
 static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam = 0, LPARAM lParam = 0);
-static void TraceString(std::string traceString);
-static void TraceStream(std::ostringstream& traceBuffer);
 
 static void StartInitThread();
-
-#define LogString(logString, ...) TraceString(MODULE_NAME + std::string("::") + std::string(__func__) + ": " + string_format(logString, __VA_ARGS__))
 
 /**
  * @brief The entry point for the dll
@@ -183,7 +161,7 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 		traceBuffer << "windowTitle='" << GetWindowTitle(hwnd) << "' ";
 		traceBuffer << "hwnd=0x'" << std::uppercase << std::hex << hwnd << "' ";
 		traceBuffer << "wParam=0x'" << std::uppercase << std::hex << wParam << "' ";
-		TraceStream(traceBuffer);
+		WinSockLogger::TraceStream(traceBuffer);
 	}
 #endif
 
@@ -447,28 +425,6 @@ static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam, LPARAM lParam
 	return PostMessage(FindWindow(NAME, NAME), message, wParam, lParam);
 }
 
-static void TraceString(std::string traceString)
-{
-	SocketSendMessage(traceString.c_str());
-
-//#ifdef _DEBUG
-//	OutputDebugStringA(traceString.c_str());
-//#endif
-}
-
-static void TraceStream(std::ostringstream& traceBuffer)
-{
-	SocketSendMessage(traceBuffer.str().c_str());
-	traceBuffer.clear();
-	traceBuffer.str(std::string());
-
-//#ifdef _DEBUG
-//	OutputDebugStringA(traceBuffer.str().c_str());
-//	traceBuffer.clear();
-//	traceBuffer.str(std::string());
-//#endif
-}
-
 /**
  * @brief Starts the hook-init in an seperate thread
  * 
@@ -489,7 +445,7 @@ void StartInitThread()
 
 	// Check the return value for success.
 	if (threadHandle == NULL) {
-		//OutputDebugStringA("Thread could not be created in Hook init-function-starter");
+		MessageBox(NULL, "Hook.dll::StartInitThread: Thread could not be created.", "WhatsappTray (Hook.dll)", MB_OK);
 	}
 
 	// Close thread handle. NOTE(SAM): For now i do not clean up the thread handle because it shouldn't be such a big deal...

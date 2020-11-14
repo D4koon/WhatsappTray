@@ -110,10 +110,12 @@
   <ItemGroup>
     <ClCompile Include="WinSockClient.cpp" />
     <ClCompile Include="Hook.cpp" />
+    <ClCompile Include="WinSockLogger.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SharedDefines.h" />
     <ClInclude Include="WinSockClient.h" />
+    <ClInclude Include="WinSockLogger.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,5 +1,7 @@
-// WinSockServer.cpp : Defines the entry point for the application.
-//
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* Copyright(C) 2020 - 2020 WhatsappTray Sebastian Amann */
+
+// Implementation for the WinSock server.
 
 #include "stdafx.h"
 #include "WinSockServer.h"
