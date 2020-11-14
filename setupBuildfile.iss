@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "WhatsappTray"
-#define MyAppVersion "1.6.2"
+#define MyAppVersion "1.7.0"
 #define MyAppURL "https://github.com/D4koon/WhatsappTray"
 #define MyAppExeName "WhatsappTray.exe"
 

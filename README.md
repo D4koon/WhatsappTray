@@ -5,6 +5,11 @@ Extension for the Whatsapp Desktop Client, that enables minimize-to-tray and clo
 **WhatsApp Desktop Client**:
 You can download that in the [WhatsApp Official Page](https://www.whatsapp.com/download/)
 
+## Features:
+- Minimize/Close button sends WhatsApp window to tray
+- Esc key sens WhatsApp window to tray
+- Toggle WhatsApp window by clicking on the tray icon
+
 ## Configuration:
 WhatsappTray can be configured through:
 - The **right-click-menue** in the tray. (Changes the values in *appData.ini*)
