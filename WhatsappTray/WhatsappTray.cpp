@@ -113,6 +113,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	MSG msg;
+	// TODO: Zweiten parameter von GetMessage Null machen? Wird die while loop verlassen?
 	while (IsWindow(_hwndWhatsappTray) && GetMessage(&msg, _hwndWhatsappTray, 0, 0)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
@@ -318,16 +319,6 @@ static bool InitWhatsappTray()
 			});
 	}
 
-	/* LoadLibrary()triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
-	 * to prevent tirggering the wndProc redirect for WhatsappTray we need to detect if this happend.
-	 * the easiest/best way to detect that is by setting a enviroment variable before LoadLibrary() */
-	_putenv_s(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR, WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE);
-	if (!(_hLib = LoadLibrary("Hook.dll"))) {
-		Logger::Error(MODULE_NAME "::WinMain() - Error loading Hook.dll.");
-		MessageBox(NULL, "Error loading Hook.dll.", "WhatsappTray", MB_OK | MB_ICONERROR);
-		return false;
-	}
-
 	// TrayManager needs to be ready before WhatsApp is started to handle 'start minimized'
 	_trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
 
@@ -405,8 +396,8 @@ static HWND StartWhatsapp()
 		return nullptr;
 	}
 
-	// Wait a maximum of 2000ms for the process to go into idle.
-	auto result = WaitForInputIdle(pi.hProcess, 2000);
+	// Wait a maximum of 8000ms for the process to go into idle.
+	auto result = WaitForInputIdle(pi.hProcess, 8000);
 	if (result != 0)
 	{
 		Logger::Info(MODULE_NAME "::StartWhatsapp() - WaitForInputIdle failed.");
@@ -613,20 +604,31 @@ static bool SetHook()
 	DWORD processId;
 	DWORD threadId = GetWindowThreadProcessId(_hwndWhatsapp, &processId);
 	if (threadId == NULL) {
-		MessageBox(NULL, "ThreadID of WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
+		MessageBox(NULL, MODULE_NAME "::SetHook() ThreadID of WhatsApp-Window not found", "WhatsappTray", MB_OK | MB_ICONERROR);
+		return false;
+	}
+
+	/* LoadLibrary()triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
+	 * to prevent tirggering the wndProc redirect for WhatsappTray we need to detect if this happend.
+	 * the easiest/best way to detect that is by setting a enviroment variable before LoadLibrary() */
+	_putenv_s(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR, WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE);
+	_hLib = LoadLibrary("Hook.dll");
+	if (_hLib == NULL) {
+		Logger::Error(MODULE_NAME "::SetHook() Error loading Hook.dll");
+		MessageBox(NULL, MODULE_NAME "::SetHook() Error loading Hook.dll", "WhatsappTray", MB_OK | MB_ICONERROR);
 		return false;
 	}
 
 	// NOTE: To see if the functions are visible use 'dumpbin /EXPORTS <pathToDll>\Hook.dll' in the debugger-console
 	auto CallWndRetProc = (HOOKPROC)GetProcAddress(_hLib, "CallWndRetProc");
 	if (CallWndRetProc == NULL) {
-		Logger::Error("The function 'CallWndRetProc' was not found.\n");
+		Logger::Error(MODULE_NAME "::SetHook() The function 'CallWndRetProc' was not found");
 		return false;
 	}
 
 	_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, _hLib, threadId);
 	if (_hWndProc == NULL) {
-		Logger::Error(MODULE_NAME "RegisterHook() - Error Creation Hook _hWndProc\n");
+		Logger::Error(MODULE_NAME "::SetHook() Error Creation Hook _hWndProc");
 		UnRegisterHook();
 		return false;
 	}

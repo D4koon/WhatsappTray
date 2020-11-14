@@ -27,9 +27,9 @@
 #include <iostream>
 #include <sstream>
 #include <psapi.h> // OpenProcess()
-#include <shellscalingapi.h> // For dpi-scaling stuff
+//#include <shellscalingapi.h> // For dpi-scaling stuff
 
-#pragma comment(lib, "SHCore") // For dpi-scaling stuff
+//#pragma comment(lib, "SHCore") // For dpi-scaling stuff
 
 // Problems with OutputDebugString:
 // Had problems that the messages from OutputDebugString in the hook-functions did not work anymore after some playing arround with old versions, suddenly it worked again.
@@ -52,7 +52,18 @@ static WNDPROC _originalWndProc = NULL;
 static UINT _dpiX; /* The horizontal dpi-size. Is set in Windows settings. Default 100% = 96 */
 static UINT _dpiY; /* The vertical dpi-size. Is set in Windows settings. Default 100% = 96 */
 
+
+typedef enum MONITOR_DPI_TYPE {
+	MDT_EFFECTIVE_DPI = 0,
+	MDT_ANGULAR_DPI = 1,
+	MDT_RAW_DPI = 2,
+	MDT_DEFAULT = MDT_EFFECTIVE_DPI
+} MONITOR_DPI_TYPE;
+
+typedef HRESULT (STDAPICALLTYPE* GetDpiForMonitorFunc)(HMONITOR, MONITOR_DPI_TYPE, UINT*, UINT*);
+
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved);
+static DWORD WINAPI Init(LPVOID lpParam);
 static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 static void UpdateDpi(HWND hwnd);
 // NOTE: extern "C" is important to disable name-mangling, so that the functions can be found with GetProcAddress(), which is used in WhatsappTray.cpp
@@ -68,7 +79,6 @@ static void TraceString(std::string traceString);
 static void TraceStream(std::ostringstream& traceBuffer);
 
 static void StartInitThread();
-static DWORD WINAPI Init(LPVOID lpParam);
 
 #define LogString(logString, ...) TraceString(MODULE_NAME + std::string("::") + std::string(__func__) + ": " + string_format(logString, __VA_ARGS__))
 
@@ -261,12 +271,31 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 	return CallWindowProc(_originalWndProc, hwnd, uMsg, wParam, lParam);
 }
 
-
 /**
  * @brief Update the windows scaling for the monitor that the window is currently on
 */
 static void UpdateDpi(HWND hwnd)
 {
+	// Windows 7 does not have screenscaling or atleast with Shcore, so if we can not find the dll, just skip the screenscaling logic.
+	static HMODULE shcoreLib = NULL;
+
+	if (shcoreLib == NULL) {
+		shcoreLib = LoadLibrary("Shcore.dll");
+		if (shcoreLib == NULL) {
+			LogString("Could not load Shcore.dll");
+			return;
+		}
+	}
+
+	auto GetDpiForMonitor = reinterpret_cast<GetDpiForMonitorFunc>(GetProcAddress(shcoreLib, "GetDpiForMonitor"));
+	if (CallWndRetProc == NULL) {
+		LogString("The function 'GetDpiForMonitor' was not found");
+		return;
+	}
+
+	// Im not cleaning this up but i thik i don't care... But leave it here as a reminder
+	//FreeLibrary(shcoreLib);
+
 	auto monitorHandle = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
 
 	auto result = GetDpiForMonitor(monitorHandle, MDT_DEFAULT, &_dpiX, &_dpiY);
@@ -449,15 +478,13 @@ static void TraceStream(std::ostringstream& traceBuffer)
 */
 void StartInitThread()
 {
-	DWORD   threadId;
-	HANDLE  threadHandle;
-
-	threadHandle = CreateThread(
-		NULL,                   // default security attributes
-		0,                      // use default stack size  
-		Init,       // thread function name
-		NULL,                   // argument to thread function 
-		0,                      // use default creation flags 
+	DWORD threadId;
+	HANDLE threadHandle = CreateThread(
+		NULL,         // default security attributes
+		0,            // use default stack size  
+		Init,         // thread function name
+		NULL,         // argument to thread function 
+		0,            // use default creation flags 
 		&threadId);   // returns the thread identifier 
 
 	// Check the return value for success.
