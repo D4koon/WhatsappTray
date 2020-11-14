@@ -101,7 +101,7 @@ void TrayManager::CreateTrayIcon(const int32_t index, const HWND hwnd)
 
 void TrayManager::CloseWindowFromTray(const HWND hwnd)
 {
-	Logger::Info(MODULE_NAME "CloseWindowFromTray() x%08X", hwnd);
+	Logger::Info(MODULE_NAME "CloseWindowFromTray() 0x%08X", hwnd);
 
 	// Use PostMessage to avoid blocking if the program brings up a dialog on exit.
 	// NOTE: WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE is a special message i made because WM_CLOSE is always blocked by the hook

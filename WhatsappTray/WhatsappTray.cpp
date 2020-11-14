@@ -84,7 +84,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	CoInitialize(nullptr);
 
 	Logger::Info(MODULE_NAME "::WinMain(): Starting WhatsappTray %s in %s CompileConfiguration.", Helper::GetProductAndVersion().c_str(), CompileConfiguration);
-
+	Logger::Info(MODULE_NAME "::WinMain(): CloseToTray=%d.", static_cast<bool>(AppData::CloseToTray.Get()));
+	
 	// Initialize WinSock-server, which is used to send log-messages from WhatsApp-hook to WhatsappTray
 	SocketNotifyOnNewMessage([](std::string message) {
 		Logger::Info("Hook> %s", message.c_str());
@@ -113,8 +114,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	MSG msg;
-	// TODO: Zweiten parameter von GetMessage Null machen? Wird die while loop verlassen?
-	while (IsWindow(_hwndWhatsappTray) && GetMessage(&msg, _hwndWhatsappTray, 0, 0)) {
+	while (GetMessage(&msg, NULL, 0, 0)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
@@ -189,6 +189,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 			_trayManager->RestoreWindowFromTray(_hwndWhatsapp);
 		} break;
 		case IDM_CLOSE: {
+			Logger::Info(MODULE_NAME "::WndProc() - IDM_CLOSE");
 			_trayManager->CloseWindowFromTray(_hwndWhatsapp);
 
 			// Close WhatsappTray
@@ -345,7 +346,7 @@ static HWND StartWhatsapp()
 		fs::path appPath = Helper::GetApplicationFilePath();
 		auto combinedPath = appPath / waStartPath;
 
-		Logger::Info(MODULE_NAME "StartWhatsapp() - Starting WhatsApp from combinedPath:%s", combinedPath.string().c_str());
+		Logger::Info(MODULE_NAME "::StartWhatsapp() - Starting WhatsApp from combinedPath:%s", combinedPath.string().c_str());
 
 		// Shorten the path by converting to absoltue path.
 		auto combinedPathCanonical = fs::canonical(combinedPath);
@@ -390,8 +391,8 @@ static HWND StartWhatsapp()
 		return nullptr;
 	}
 
-	// Wait a maximum of 8000ms for the process to go into idle.
-	auto result = WaitForInputIdle(pi.hProcess, 8000);
+	// Wait a maximum of 10 seconds for the process to go into idle.
+	auto result = WaitForInputIdle(pi.hProcess, 10000);
 	if (result != 0)
 	{
 		Logger::Info(MODULE_NAME "::StartWhatsapp() - WaitForInputIdle failed.");
@@ -411,17 +412,18 @@ static HWND StartWhatsapp()
 			MessageBoxA(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
 			return nullptr;
 		}
-		Logger::Info(MODULE_NAME "StartWhatsapp() - WhatsApp-Window not found. Wait 500ms and retry.");
+		Logger::Info(MODULE_NAME "::StartWhatsapp() - WhatsApp-Window not found. Wait 500ms and retry.");
 		Sleep(500);
 	}
 
-	Logger::Info(MODULE_NAME "StartWhatsapp() - WhatsApp-Window found.");
+	Logger::Info(MODULE_NAME "::StartWhatsapp() - WhatsApp-Window found.");
 
 	return _hwndWhatsapp;
 }
 
 /**
- * Search for the WhatsApp window.
+ * Search for the WhatsApp window
+ * WARNING: The WhatsApp window needs to be visible!
  * Checks if it is the correct window:
  * 1. Get the path to the binary(exe) for the window with "WhatsApp" in the title
  * 2. Match it with the appData-setting.
@@ -442,11 +444,13 @@ static HWND FindWhatsapp()
 		// Because of that it can happen that the wrong window is set.
 		// To prevent that it is checked if the window is visible because 'Whatsapp Voip'-window seems to be always hidden. NOTE: I Could also always check the window later before i use it...
 		if (IsWindowVisible(iteratedHwnd) == false) {
+			Logger::Info(MODULE_NAME "::FindWhatsapp() - Window is not visible");
 			continue;
 		}
 
-		// Also check length because compare also matches strings that are longer like 'WhatsApp Voip'
+		// Also check length because compare also matches strings that are longer like 'WhatsApp Voip'. Not sure if that is true but i leave it for now...
 		if (windowTitle.compare(WHATSAPP_CLIENT_NAME) != 0 && windowTitle.length() == strlen(WHATSAPP_CLIENT_NAME)) {
+			Logger::Info(MODULE_NAME "::FindWhatsapp() - Window name does not match");
 			continue;
 		}
 
