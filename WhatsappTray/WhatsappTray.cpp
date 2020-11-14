@@ -48,12 +48,12 @@ constexpr auto CompileConfiguration = "Release";
 #undef MODULE_NAME
 #define MODULE_NAME "WhatsappTray"
 
-static HINSTANCE _hInstance = NULL;
-static HWND _hwndWhatsappTray = NULL;
-static HWND _hwndWhatsapp = NULL;
+static HINSTANCE _hInstance = NULL; /* Handle to the instance of WhatsappTray */
+static HWND _hwndWhatsappTray = NULL; /* Handle to the window of WhatsappTray */
+static HWND _hwndWhatsapp = NULL; /* Handle to the window of WhatsApp */
 
-static HHOOK _hWndProc = NULL;
-static HMODULE _hLib = NULL;
+static HHOOK _hWndProc = NULL; /* Handle to the Hook from SetWindowsHookEx() */
+static HMODULE _hLib = NULL; /* Handle to the Hook.dll */
 
 static int _messagesSinceMinimize = 0;
 
@@ -170,10 +170,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		} break;
 		case IDM_SETTING_CLOSE_TO_TRAY: {
 			// Toggle the 'close to tray'-feature.
-			// We have to first change the value and then unregister and register to set the ne value in the hook.
 			AppData::CloseToTray.Set(!AppData::CloseToTray.Get());
-
-			SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
 		} break;
 		case IDM_SETTING_LAUNCH_ON_WINDOWS_STARTUP: {
 			// Toggle the 'launch on windows startup'-feature.
@@ -194,16 +191,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		case IDM_CLOSE: {
 			_trayManager->CloseWindowFromTray(_hwndWhatsapp);
 
-			// Running WhatsappTray without Whatsapp makes no sence because if a new instance of Whatsapp is started, WhatsappTray would not hook it. Atleast not in the current implementation...
-			DestroyWindow(_hwndWhatsappTray);
+			// Close WhatsappTray
+			SendMessage(_hwndWhatsappTray, WM_CLOSE, 0, 0);
 		} break;
 		}
 	} break;
-	case WM_REAPPLY_HOOK: {
-		UnRegisterHook();
-		_hwndWhatsapp = FindWhatsapp();
-		SetHook();
-	}break;
 	case WM_WA_MINIMIZE_BUTTON_PRESSED: {
 		Logger::Info(MODULE_NAME "::WndProc() - WM_WA_MINIMIZE_BUTTON_PRESSED");
 
@@ -234,14 +226,16 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		}
 	} break;
 	case WM_WHAHTSAPP_CLOSING: {
-		// If Whatsapp is closing we want to close WhatsappTray as well.
 		Logger::Info(MODULE_NAME "::WndProc() - WM_WHAHTSAPP_CLOSING");
-		DestroyWindow(_hwndWhatsappTray);
+
+		// Whatsapp is closing
+		// Close WhatsappTray
+		SendMessage(_hwndWhatsappTray, WM_CLOSE, 0, 0);
 	} break;
 	case WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE: {
 		Logger::Info(MODULE_NAME "::" + std::string(__func__) + "() - WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE received");
 		// This message means that WhatsApp received a WM_CLOSE-message.
-		// This happens when alt + f4 is pressed.
+		// This happens when Alt + F4 is pressed.
 
 		if (AppData::CloseToTray.Get()) {
 			// Close to tray is activated => Minimize Whatsapp to tray.
@@ -341,7 +335,7 @@ static bool InitWhatsappTray()
 }
 
 /**
- * @brief Starts WhatsApp.
+ * @brief Start WhatsApp
  */
 static HWND StartWhatsapp()
 {
@@ -494,11 +488,6 @@ static void TryClosePreviousWhatsappTrayInstance()
 		Logger::Error(MODULE_NAME "::WinMain() - If this error persists, try to close the other instance by hand using for example the taskmanager.");
 		//if (strstr(lpCmdLine, "--exit")) {
 		SendMessage(_hwndWhatsappTray, WM_CLOSE, 0, 0);
-		//} else {
-		//	//MessageBox(NULL, "WhatsappTray is already running. Reapplying hook", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-		//	SendMessage(_hwndWhatsappTray, WM_REAPPLY_HOOK, 0, 0);
-		//}
-		//return 0;
 
 #pragma WARNING("It would be best to wait her a bit and check if it is still active. And if it is still active shoot it down.")
 	}
@@ -510,7 +499,7 @@ static void TryClosePreviousWhatsappTrayInstance()
  */
 static bool CreateWhatsappTrayWindow()
 {
-	WNDCLASS wc;
+	WNDCLASS wc{};
 	wc.style = 0;
 	wc.lpfnWndProc = WndProc;
 	wc.cbClsExtra = 0;
@@ -608,15 +597,18 @@ static bool SetHook()
 		return false;
 	}
 
-	/* LoadLibrary()triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
-	 * to prevent tirggering the wndProc redirect for WhatsappTray we need to detect if this happend.
-	 * the easiest/best way to detect that is by setting a enviroment variable before LoadLibrary() */
-	_putenv_s(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR, WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE);
-	_hLib = LoadLibrary("Hook.dll");
+	// For the case when this function is called multiple times, check if the dll is already loaded
 	if (_hLib == NULL) {
-		Logger::Error(MODULE_NAME "::SetHook() Error loading Hook.dll");
-		MessageBox(NULL, MODULE_NAME "::SetHook() Error loading Hook.dll", "WhatsappTray", MB_OK | MB_ICONERROR);
-		return false;
+		/* LoadLibrary()triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
+		 * to prevent tirggering the wndProc redirect for WhatsappTray we need to detect if this happend.
+		 * the easiest/best way to detect that is by setting a enviroment variable before LoadLibrary() */
+		_putenv_s(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR, WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE);
+		_hLib = LoadLibrary("Hook.dll");
+		if (_hLib == NULL) {
+			Logger::Error(MODULE_NAME "::SetHook() Error loading Hook.dll");
+			MessageBox(NULL, MODULE_NAME "::SetHook() Error loading Hook.dll", "WhatsappTray", MB_OK | MB_ICONERROR);
+			return false;
+		}
 	}
 
 	// NOTE: To see if the functions are visible use 'dumpbin /EXPORTS <pathToDll>\Hook.dll' in the debugger-console
