@@ -166,6 +166,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 			// Toggle the 'ShowUnreadMessages'-feature.
 			AppData::ShowUnreadMessages.Set(!AppData::ShowUnreadMessages.Get());
 		} break;
+		case IDM_SETTING_CLOSE_TO_TRAY_WITH_ESCAPE: {
+			// Toggle the 'CloseToTrayWithEscape'-feature.
+			AppData::CloseToTrayWithEscape.Set(!AppData::CloseToTrayWithEscape.Get());
+		} break;
 		case IDM_RESTORE: {
 			LogInfo("IDM_RESTORE");
 			_trayManager->RestoreWindowFromTray(_hwndWhatsapp);
@@ -203,9 +207,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 	case WM_WA_KEY_PRESSED: {
 		LogInfo("WM_WA_KEY_PRESSED wParam=%d", wParam);
 
-		if (wParam == 27) {
-			// Esc-key was pressed
-			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
+		if (AppData::CloseToTrayWithEscape.Get() == true) {
+			if (wParam == 27) {
+				// Esc-key was pressed
+				_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
+			}
 		}
 	} break;
 	case WM_WHAHTSAPP_CLOSING: {
@@ -554,6 +560,13 @@ static void ExecuteMenu()
 		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages (experimental)");
 	} else {
 		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages (experimental)");
+	}
+
+	// -- Close to tray with escape key.
+	if (AppData::CloseToTrayWithEscape.Get()) {
+		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_CLOSE_TO_TRAY_WITH_ESCAPE, "Close to tray with escape key");
+	} else {
+		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_CLOSE_TO_TRAY_WITH_ESCAPE, "Close to tray with escape key");
 	}
 
 	AppendMenu(hMenu, MF_SEPARATOR, 0, NULL); //--------------
