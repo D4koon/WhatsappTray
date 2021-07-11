@@ -334,13 +334,13 @@ static HWND StartWhatsapp()
 		fs::path appPath = Helper::GetApplicationFilePath();
 		auto combinedPath = appPath / waStartPath;
 
-		LogInfo("Starting WhatsApp from combinedPath:%s", combinedPath.string().c_str());
+		LogInfo("Starting WhatsApp from combinedPath:%s", combinedPath.u8string().c_str());
 
 		// Shorten the path by converting to absoltue path.
 		auto combinedPathCanonical = fs::canonical(combinedPath);
-		waStartPathString = combinedPathCanonical.string();
+		waStartPathString = combinedPathCanonical.u8string();
 	} else {
-		waStartPathString = waStartPath.string();
+		waStartPathString = waStartPath.u8string();
 	}
 
 	LogInfo("Starting WhatsApp from canonical-path:'" + waStartPathString + "'");

@@ -225,7 +225,7 @@ HICON TrayManager::AddTextToIcon(HICON hBackgroundIcon, LPCSTR text)
 		pointF = PointF(-6.0f, -1.5f);
 	}
 
-	graphics.DrawString(Helper::ToWString(text).c_str(), -1, &font, pointF, &brush);
+	graphics.DrawString(Helper::Utf8ToWide(text).c_str(), -1, &font, pointF, &brush);
 
 	::SelectObject(hMemDC, hOldBmp);
 

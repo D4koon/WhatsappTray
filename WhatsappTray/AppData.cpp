@@ -23,7 +23,7 @@ DataEntryS<SBool> AppData::StartMinimized(Data::START_MINIMIZED, false, &AppData
 DataEntryS<SBool> AppData::ShowUnreadMessages(Data::SHOW_UNREAD_MESSAGES, false, &AppData::SetData);
 DataEntryS<SBool> AppData::CloseToTrayWithEscape(Data::CLOSE_TO_TRAY_WITH_ESCAPE, false, &AppData::SetData);
 DataEntryS<SString> AppData::WhatsappStartpath(Data::WHATSAPP_STARTPATH, std::string("%userStartmenuePrograms%\\WhatsApp\\WhatsApp.lnk"), &AppData::SetData);
-DataEntryS<SString> AppData::WhatsappRoamingDirectory(Data::WHATSAPP_ROAMING_DIRECTORY, Helper::GetWindowsAppDataDirectory(), &AppData::SetData);
+DataEntryS<SString> AppData::WhatsappRoamingDirectory(Data::WHATSAPP_ROAMING_DIRECTORY, Helper::GetWindowsAppDataRoamingDirectory(), &AppData::SetData);
 
 /// Initialize the dummy-value initDone with a lambda to get a static-constructor like behavior. NOTE: The disadvantage is though that we can not control the order. For example if we want to make sure that the logger inits first.
 bool AppData::initDone([]() 
@@ -87,23 +87,6 @@ std::string AppData::GetDataOrSetDefault(DataEntry& value)
  */
 std::string AppData::GetAppDataFilePath()
 {
-	//char appDataDirectory[MAX_PATH] = { 0 };
-	//if (SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, appDataDirectory) != S_OK) {
-	//	Logger::Error(MODULE_NAME "GetAppDataFilePath() - Saving app-data failed because the path could not be received.");
-	//	MessageBoxA(NULL, MODULE_NAME "GetAppDataFilePath() - Saving app-data failed because the path could not be received.", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-	//	return "";
-	//}
-
-	//// Create data-folder if not exists.
-	//strcat_s(appDataDirectory, MAX_PATH, TEXT("\\WhatsappTray\\"));
-	//if (CreateDirectory(appDataDirectory, NULL) == NULL) {
-	//	// We can get here, if the folder already exists -> We don't want an error for that case ...
-	//	if (GetLastError() != ERROR_ALREADY_EXISTS) {
-	//		Logger::Error(MODULE_NAME "GetAppDataFilePath() - Saving app-data failed because the folder could not be created.");
-	//		MessageBoxA(NULL, MODULE_NAME "GetAppDataFilePath() - Saving app-data failed because the folder could not be created.", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-	//		return "";
-	//	}
-	//}
 	std::string appDirectory = Helper::GetApplicationDirectory();
 
 	std::string appDataFilePath(appDirectory);
@@ -122,8 +105,8 @@ std::string AppData::WhatsappStartpathGet()
 	Helper::Replace(path, "%userStartmenuePrograms%", Helper::GetStartMenuProgramsDirectory());
 	Helper::Replace(path, "%UserProfile%", Helper::GetCurrentUserDirectory());
 	Helper::Replace(path, "%userprofile%", Helper::GetCurrentUserDirectory());
-	Helper::Replace(path, "%AppData%", Helper::GetCurrentUserAppData());
-	Helper::Replace(path, "%appdata%", Helper::GetCurrentUserAppData());
+	Helper::Replace(path, "%AppData%", Helper::GetWindowsAppDataRoamingDirectory());
+	Helper::Replace(path, "%appdata%", Helper::GetWindowsAppDataRoamingDirectory());
 
 	return path;
 }
@@ -137,8 +120,8 @@ std::string AppData::WhatsappRoamingDirectoryGet()
 
 	Helper::Replace(path, "%UserProfile%", Helper::GetCurrentUserDirectory());
 	Helper::Replace(path, "%userprofile%", Helper::GetCurrentUserDirectory());
-	Helper::Replace(path, "%AppData%", Helper::GetCurrentUserAppData());
-	Helper::Replace(path, "%appdata%", Helper::GetCurrentUserAppData());
+	Helper::Replace(path, "%AppData%", Helper::GetWindowsAppDataRoamingDirectory());
+	Helper::Replace(path, "%appdata%", Helper::GetWindowsAppDataRoamingDirectory());
 
 	return path;
 }

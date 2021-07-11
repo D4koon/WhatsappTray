@@ -48,52 +48,6 @@ std::string Helper::GetApplicationDirectory()
 	return applicationFilePath.substr(0, found) + "\\";
 }
 
-/**
-* Untested!
-*/
-std::wstring Helper::ToWString(const std::string& inputString)
-{
-	const char* inputC_String = inputString.c_str();
-	size_t size = inputString.length() + 1;
-	wchar_t* outputStringBuffer = new wchar_t[size];
-
-	size_t outSize;
-	errno_t convertResult = mbstowcs_s(&outSize, outputStringBuffer, size, inputC_String, size - 1);
-
-	if (convertResult != NULL) {
-		Logger::Error("Error in mbsrtowcs(): %d", errno);
-		return L"";
-	}
-
-	std::wstring outputString = outputStringBuffer;
-	delete[] outputStringBuffer;
-
-	return outputString;
-}
-
-/**
-* Convert a std::wstring to a std::string.
-*/
-std::string Helper::ToString(const std::wstring& inputString)
-{
-	const wchar_t* inputC_String = inputString.c_str();
-	size_t size = inputString.length() + 1;
-	char* outputStringBuffer = new char[size];
-
-	size_t outSize;
-	errno_t convertResult = wcstombs_s(&outSize, outputStringBuffer, size, inputC_String, size - 1);
-
-	if (convertResult != NULL) {
-		Logger::Error("Error in mbsrtowcs(): %d", errno);
-		return "";
-	}
-
-	std::string outputString = outputStringBuffer;
-	delete[] outputStringBuffer;
-
-	return outputString;
-}
-
 std::wstring Helper::Utf8ToWide(const std::string& inputString)
 {
 	int size_needed = MultiByteToWideChar(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), NULL, 0);
@@ -102,6 +56,11 @@ std::wstring Helper::Utf8ToWide(const std::string& inputString)
 	return wstrTo;
 }
 
+/**
+* Convert a std::wstring to a std::string.
+* 
+* NOTE: Non ascii-characters will look broken when viewed in the debugger, to see the UTF-8 representation use the watch-window and add ',s8'
+*/
 std::string Helper::WideToUtf8(const std::wstring& inputString)
 {
 	int size_needed = WideCharToMultiByte(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), NULL, 0, NULL, NULL);
@@ -181,44 +140,39 @@ std::string Helper::GetStartMenuProgramsDirectory()
 		MessageBoxA(NULL, "'Start Menu\\Programs' folder not found", "WhatsappTray", MB_OK);
 		return NULL;
 	}
-	std::string startMenuPrograms = Helper::ToString(startMenuProgramsBuffer);
+	std::string startMenuPrograms = Helper::WideToUtf8(startMenuProgramsBuffer);
 	CoTaskMemFree(startMenuProgramsBuffer);
 	return startMenuPrograms;
-}
-
-std::string Helper::GetWindowsAppDataDirectory()
-{
-	char appDataDirectory[MAX_PATH] = { 0 };
-	if (SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, appDataDirectory) != S_OK) {
-		Logger::Fatal(MODULE_NAME "Init() - Could not get the AppData-directory!");
-		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the AppData-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-		return "";
-	}
-	return appDataDirectory;
-}
-
-std::string Helper::GetCurrentUserDirectory()
-{
-	char currentUserDirectory[MAX_PATH] = { 0 };
-	if (SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, SHGFP_TYPE_CURRENT, currentUserDirectory) != S_OK) {
-		Logger::Fatal(MODULE_NAME "Init() - Could not get the CurrentUser-directory!");
-		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the CurrentUser-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
-		return "";
-	}
-	return currentUserDirectory;
 }
 
 /**
  * @brief Gets the path to C:\Users\<JohnDoe>\AppData\Roaming
 */
-std::string Helper::GetCurrentUserAppData()
+std::string Helper::GetWindowsAppDataRoamingDirectory()
 {
-	char currentUserDirectory[MAX_PATH] = { 0 };
-	if (SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, SHGFP_TYPE_CURRENT, currentUserDirectory) != S_OK) {
+	PWSTR appDataRoamingDirectoryWide = NULL;
+	if (SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, NULL, &appDataRoamingDirectoryWide) != S_OK) {
+		Logger::Fatal(MODULE_NAME "Init() - Could not get the AppDataRoaming-directory!");
+		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the AppDataRoaming-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
+		return "";
+	}
+
+	std::string appDataRoamingDirectory = Helper::WideToUtf8(appDataRoamingDirectoryWide);
+	CoTaskMemFree(appDataRoamingDirectoryWide);
+	return appDataRoamingDirectory;
+}
+
+std::string Helper::GetCurrentUserDirectory()
+{
+	PWSTR currentUserDirectoryWide = NULL;
+	if (SHGetKnownFolderPath(FOLDERID_Profile, KF_FLAG_DEFAULT, NULL, &currentUserDirectoryWide) != S_OK) {
 		Logger::Fatal(MODULE_NAME "Init() - Could not get the CurrentUser-directory!");
 		MessageBoxA(NULL, MODULE_NAME "Init() - Fatal: Could not get the CurrentUser-directory!", "WhatsappTray", MB_OK | MB_ICONINFORMATION);
 		return "";
 	}
+
+	std::string currentUserDirectory = Helper::WideToUtf8(currentUserDirectoryWide);
+	CoTaskMemFree(currentUserDirectoryWide);
 	return currentUserDirectory;
 }
 
@@ -279,7 +233,7 @@ std::string Helper::ResolveLnk(HWND hwnd, LPCSTR lpszLinkFile)
 			WCHAR wsz[MAX_PATH];
 
 			// Ensure that the string is Unicode. 
-			MultiByteToWideChar(CP_ACP, 0, lpszLinkFile, -1, wsz, MAX_PATH);
+			MultiByteToWideChar(CP_UTF8, 0, lpszLinkFile, -1, wsz, MAX_PATH);
 
 			// Add code here to check return value from MultiByteWideChar 
 			// for success.

@@ -17,17 +17,14 @@ public:
 
 	static std::string Helper::GetApplicationFilePath();
 	static std::string GetApplicationDirectory();
-	static std::wstring Helper::ToWString(const std::string& inputString);
-	static std::string Helper::ToString(const std::wstring& inputString);
 	static std::wstring Utf8ToWide(const std::string& inputString);
 	static std::string WideToUtf8(const std::wstring& inputString);
 	static bool Replace(std::string& str, const std::string& oldValue, const std::string& newValue);
 	static HICON GetWindowIcon(HWND hwnd);
 	static std::string GetProductAndVersion();
 	static std::string GetStartMenuProgramsDirectory();
-	static std::string GetWindowsAppDataDirectory();
+	static std::string GetWindowsAppDataRoamingDirectory();
 	static std::string GetCurrentUserDirectory();
-	static std::string GetCurrentUserAppData();
 	static std::string GetFilenameFromPath(std::string path);
 	static std::wstring GetFilenameFromPath(std::wstring path);
 	static std::string ResolveLnk(HWND hwnd, LPCSTR lpszLinkFile);
