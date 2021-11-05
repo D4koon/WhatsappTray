@@ -31,10 +31,10 @@ jobs:
       # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}}
     
-    - name: Archive WhatsappTray (WhatsappTray.exe and Hook.dll)
+    - name: Archive WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
       uses: actions/upload-artifact@v2
       with:
-        name: WhatsappTray
+        name: WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
         path: |
           bin/Release/WhatsappTray.exe
           bin/Release/Hook.dll
@@ -45,5 +45,5 @@ jobs:
     - name: Archive Installer
       uses: actions/upload-artifact@v2
       with:
-        name: WhatsappTray
+        name: WhatsappTray installer
         path: Output/*.exe
