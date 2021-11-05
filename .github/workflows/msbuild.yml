@@ -38,3 +38,12 @@ jobs:
         path: |
           bin/Release/WhatsappTray.exe
           bin/Release/Hook.dll
+
+    - name: Packages as installer
+      run: setup_creator_binaries/ISCC.exe "setupBuildfile.iss"
+
+    - name: Archive Installer
+      uses: actions/upload-artifact@v2
+      with:
+        name: WhatsappTray
+        path: Output/*.exe
