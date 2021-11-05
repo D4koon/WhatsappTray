@@ -19,7 +19,7 @@
 #include <Strsafe.h>
 #include <filesystem>
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 #ifdef _DEBUG
 constexpr auto CompileConfiguration = "Debug";
