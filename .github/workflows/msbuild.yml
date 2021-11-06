@@ -46,7 +46,7 @@ jobs:
       
       # NOTE: The space here is on purpose because after much trying i could not set the env-var to an empty string
     - name: Set application-name-suffix
-      if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
+      if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == 0
       run: echo "APPLICATION_NAME_SUFFIX= " >> $GITHUB_ENV
       shell: bash
 
