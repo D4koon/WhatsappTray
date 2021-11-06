@@ -11,7 +11,7 @@ env:
   # https://docs.github.com/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
   BUILD_CONFIGURATION: Release
   
-  APPLICATION_NAME_SUFFIX: " DEBUG"
+  APPLICATION_NAME_SUFFIX: " DEBUG "
 
 jobs:
   build:
@@ -54,7 +54,7 @@ jobs:
     - name: Archive WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
       uses: actions/upload-artifact@v2
       with:
-        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}} binaries (WhatsappTray.exe and Hook.dll)
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}}binaries (WhatsappTray.exe and Hook.dll)
         path: |
           bin/Release/WhatsappTray.exe
           bin/Release/Hook.dll
