@@ -44,9 +44,10 @@ jobs:
       run: echo ${{env.WA_TRAY_VERSION}}
       shell: bash
       
+      # NOTE: The space here is on purpose because after much trying i could not set the env-var to an empty string
     - name: Set application-name-suffix
       if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
-      run: echo "APPLICATION_NAME_SUFFIX=${{ null }} >> $GITHUB_ENV
+      run: echo "APPLICATION_NAME_SUFFIX= " >> $GITHUB_ENV
       shell: bash
 
     # === Archive ===
@@ -64,5 +65,5 @@ jobs:
     - name: Archive WhatsappTray Installer
       uses: actions/upload-artifact@v2
       with:
-        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}} installer
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}}installer
         path: Output/*.exe
