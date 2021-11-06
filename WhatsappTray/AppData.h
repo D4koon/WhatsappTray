@@ -7,6 +7,7 @@
 #include <string>
 #include <map>
 #include <thread>
+#include <functional>
 
 BETTER_ENUM(Data, uint8_t, 
 	CLOSE_TO_TRAY,

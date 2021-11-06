@@ -35,7 +35,7 @@ BEGIN
             VALUE "FileDescription", "WhatsappTray"
             VALUE "FileVersion", MY_PRODUCT_VERSION
             VALUE "InternalName", "WhatsappTray"
-            VALUE "LegalCopyright", "Copyright © 1998-2019 Sebastian Amann, Nikolay Redko, J.D. Purcell"
+            VALUE "LegalCopyright", "Copyright Â© 1998-2019 Sebastian Amann, Nikolay Redko, J.D. Purcell"
             VALUE "OriginalFilename", "WhatsappTray.exe"
             VALUE "ProductName", "WhatsappTray"
             VALUE "ProductVersion", MY_PRODUCT_VERSION

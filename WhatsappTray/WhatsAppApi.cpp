@@ -16,7 +16,7 @@
 #include <Shlobj.h>
 #include <filesystem>
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 #undef MODULE_NAME
 #define MODULE_NAME "WhatsAppApi::"
