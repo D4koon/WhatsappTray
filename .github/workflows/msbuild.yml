@@ -46,8 +46,8 @@ jobs:
       
     - name: Set application-name-suffix
       if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
-      run: echo "APPLICATION_NAME_SUFFIX=\"\"" >> $GITHUB_ENV
-      shell: bash
+      env:
+        APPLICATION_NAME_SUFFIX: ${{ null }}
 
     # === Archive ===
     - name: Archive WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
