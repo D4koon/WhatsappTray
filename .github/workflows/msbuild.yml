@@ -18,11 +18,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-    - name: Set env
+    - name: Set WA_TRAY_VERSION env-variable
       run: cat <(echo -n "WA_TRAY_VERSION=") <(sed -n "s/^.*#define MAJOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define MINOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define PATCH \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') >> $GITHUB_ENV
       shell: bash
 
-    - name: Set env
+    - name: Show WhatsappTray-version
       run: echo ${{env.WA_TRAY_VERSION}}
 
     - name: Add MSBuild to PATH
@@ -41,7 +41,7 @@ jobs:
     - name: Archive WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
       uses: actions/upload-artifact@v2
       with:
-        name: WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
+        name: WhatsappTray binaries (WhatsappTray.exe and Hook.dll) ${{env.WA_TRAY_VERSION}}
         path: |
           bin/Release/WhatsappTray.exe
           bin/Release/Hook.dll
