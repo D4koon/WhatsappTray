@@ -17,6 +17,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    
+    - name: Set env
+      run: cat <(echo -n "WA_TRAY_VERSION=") <(sed -n "s/^.*#define MAJOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define MINOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define PATCH \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') >> $GITHUB_ENV
+
+    - name: Set env
+      run: echo ${{env.WA_TRAY_VERSION}}
 
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v1.0.2
