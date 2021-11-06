@@ -46,6 +46,7 @@ jobs:
       
     - name: Set application-name-suffix
       if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
+      run: echo "Set application-name-suffix"
       env:
         APPLICATION_NAME_SUFFIX: ${{ null }}
 
