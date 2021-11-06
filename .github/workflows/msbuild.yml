@@ -10,6 +10,8 @@ env:
   # You can convert this to a build matrix if you need coverage of multiple configuration types.
   # https://docs.github.com/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
   BUILD_CONFIGURATION: Release
+  
+  APPLICATION_NAME_SUFFIX: " DEBUG"
 
 jobs:
   build:
@@ -29,11 +31,7 @@ jobs:
       # Add additional options to the MSBuild command line here (like platform or verbosity level).
       # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}}
-      
-  setup_enviroment_variables:
-    needs: build
-    runs-on: windows-latest
-    steps:
+
     - name: Set WA_TRAY_VERSION env-variable
       run: cat <(echo -n "WA_TRAY_VERSION=") <(sed -n "s/^.*#define MAJOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define MINOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define PATCH \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') >> $GITHUB_ENV
       shell: bash
@@ -44,5 +42,26 @@ jobs:
 
     - name: Show WhatsappTray-version
       run: echo ${{env.WA_TRAY_VERSION}}
+      
+    - name: Set app-name-suffix
+      if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
+      run: echo "APPLICATION_NAME_SUFFIX=" >> $GITHUB_ENV
 
+    # === Archive ===
+    - name: Archive WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
+      if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
+      uses: actions/upload-artifact@v2
+      with:
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.WA_TRAY_VERSION}} binaries (WhatsappTray.exe and Hook.dll)
+        path: |
+          bin/Release/WhatsappTray.exe
+          bin/Release/Hook.dll
+        
+    - name: Package as installer
+      run: setup_creator_binaries/ISCC.exe "setupBuildfile.iss"
 
+    - name: Archive Installer
+      uses: actions/upload-artifact@v2
+      with:
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.WA_TRAY_VERSION}} installer
+        path: Output/*.exe
