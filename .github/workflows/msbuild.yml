@@ -14,16 +14,8 @@ env:
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
     - uses: actions/checkout@v2
-    
-    - name: Set WA_TRAY_VERSION env-variable
-      run: cat <(echo -n "WA_TRAY_VERSION=") <(sed -n "s/^.*#define MAJOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define MINOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define PATCH \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') >> $GITHUB_ENV
-      shell: bash
-
-    - name: Show WhatsappTray-version
-      run: echo ${{env.WA_TRAY_VERSION}}
 
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v1.0.2
@@ -37,7 +29,27 @@ jobs:
       # Add additional options to the MSBuild command line here (like platform or verbosity level).
       # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}}
-    
+      
+  setup_enviroment_variables:
+    needs: build
+    runs-on: windows-latest
+    steps:
+    - name: Set WA_TRAY_VERSION env-variable
+      run: cat <(echo -n "WA_TRAY_VERSION=") <(sed -n "s/^.*#define MAJOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define MINOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define PATCH \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') >> $GITHUB_ENV
+      shell: bash
+      
+    - name: Set WA_TRAY_VERSION_IS_DEBUG env-variable
+      run: cat <(echo -n "WA_TRAY_VERSION_IS_DEBUG=") <(sed -n "s/^.*#define IS_DEBUG \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') >> $GITHUB_ENV
+      shell: bash
+
+    - name: Show WhatsappTray-version
+      run: echo ${{env.WA_TRAY_VERSION}}
+
+  publish_release_job:
+    if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
+    needs: setup_enviroment_variables
+    runs-on: windows-latest
+    steps:
     - name: Archive WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
       uses: actions/upload-artifact@v2
       with:
@@ -53,4 +65,26 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: WhatsappTray ${{env.WA_TRAY_VERSION}} installer
+        path: Output/*.exe
+  
+  publish_debug_job:
+    if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} != '0'
+    needs: setup_enviroment_variables
+    runs-on: windows-latest
+    steps:
+    - name: Archive WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
+      uses: actions/upload-artifact@v2
+      with:
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}} DEBUG binaries (WhatsappTray.exe and Hook.dll)
+        path: |
+          bin/Release/WhatsappTray.exe
+          bin/Release/Hook.dll
+
+    - name: Packages as installer
+      run: setup_creator_binaries/ISCC.exe "setupBuildfile.iss"
+
+    - name: Archive Installer
+      uses: actions/upload-artifact@v2
+      with:
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}} DEBUG installer
         path: Output/*.exe
