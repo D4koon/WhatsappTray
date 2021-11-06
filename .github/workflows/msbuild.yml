@@ -43,13 +43,12 @@ jobs:
     - name: Show WhatsappTray-version
       run: echo ${{env.WA_TRAY_VERSION}}
       
-    - name: Set app-name-suffix
+    - name: Set application-name-suffix
       if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
-      run: echo "APPLICATION_NAME_SUFFIX=" >> $GITHUB_ENV
+      run: echo "APPLICATION_NAME_SUFFIX=''" >> $GITHUB_ENV
 
     # === Archive ===
     - name: Archive WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
-      if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
       uses: actions/upload-artifact@v2
       with:
         name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}} binaries (WhatsappTray.exe and Hook.dll)
@@ -57,10 +56,10 @@ jobs:
           bin/Release/WhatsappTray.exe
           bin/Release/Hook.dll
         
-    - name: Package as installer
+    - name: Package WhatsappTray as installer
       run: setup_creator_binaries/ISCC.exe "setupBuildfile.iss"
 
-    - name: Archive Installer
+    - name: Archive WhatsappTray Installer
       uses: actions/upload-artifact@v2
       with:
         name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}} installer
