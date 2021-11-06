@@ -52,7 +52,7 @@ jobs:
       if: ${{env.WA_TRAY_VERSION_IS_DEBUG}} == '0'
       uses: actions/upload-artifact@v2
       with:
-        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.WA_TRAY_VERSION}} binaries (WhatsappTray.exe and Hook.dll)
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}} binaries (WhatsappTray.exe and Hook.dll)
         path: |
           bin/Release/WhatsappTray.exe
           bin/Release/Hook.dll
@@ -63,5 +63,5 @@ jobs:
     - name: Archive Installer
       uses: actions/upload-artifact@v2
       with:
-        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.WA_TRAY_VERSION}} installer
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}} installer
         path: Output/*.exe
