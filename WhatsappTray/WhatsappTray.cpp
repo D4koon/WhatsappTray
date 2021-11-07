@@ -379,8 +379,8 @@ static HWND StartWhatsapp()
 		return nullptr;
 	}
 
-	// Wait a maximum of 10 seconds for the process to go into idle.
-	auto result = WaitForInputIdle(pi.hProcess, 10000);
+	// Wait a maximum of 60 seconds for the process to go into idle.
+	auto result = WaitForInputIdle(pi.hProcess, 60000);
 	if (result != 0)
 	{
 		LogInfo("WaitForInputIdle failed.");
