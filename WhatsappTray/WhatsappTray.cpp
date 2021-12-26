@@ -346,8 +346,8 @@ static HWND StartWhatsapp()
 
 	auto pi = Helper::StartProcess(waStartPathString);
 
-	// Wait a maximum of 60 seconds for the process to go into idle.
-	auto result = WaitForInputIdle(pi.hProcess, 60000);
+	// Wait a maximum of 120 seconds for the process to go into idle.
+	auto result = WaitForInputIdle(pi.hProcess, 120000);
 	if (result != 0)
 	{
 		MessageBoxA(NULL, "WhatsApp-Process still in idle after 120 seconds. Aborting start of WhatsappTray", "WhatsappTray", MB_OK | MB_ICONERROR);
@@ -365,7 +365,7 @@ static HWND StartWhatsapp()
 	for (int attemptN = 0; _hwndWhatsapp == NULL; ++attemptN) {
 		_hwndWhatsapp = FindWhatsapp();
 
-		if (attemptN > 60) {
+		if (attemptN > 240) {
 			MessageBoxA(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
 			return nullptr;
 		}
