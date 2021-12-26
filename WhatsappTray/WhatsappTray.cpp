@@ -8,7 +8,6 @@
 
 #include "AppData.h"
 #include "Registry.h"
-#include "WhatsAppApi.h"
 #include "TrayManager.h"
 #include "AboutDialog.h"
 #include "WinSockServer.h"
@@ -74,8 +73,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	});
 
 	_winsockThread = std::thread(SocketStart, _loggerPort);
-
-	WhatsAppApi::Init();
 
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
@@ -314,9 +311,6 @@ static bool InitWhatsappTray()
 		LogError("Error setting hook.");
 		return false;
 	}
-
-	// Send a WM_WHATSAPP_API_NEW_MESSAGE-message when a new WhatsApp-message has arrived.
-	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_WHATSAPP_API_NEW_MESSAGE, 0, 0); });
 
 	return true;
 }

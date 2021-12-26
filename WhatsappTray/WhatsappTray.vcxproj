@@ -126,35 +126,26 @@
   <ItemGroup>
     <ClCompile Include="AboutDialog.cpp" />
     <ClCompile Include="AppData.cpp" />
-    <ClCompile Include="DirectoryWatcher.cpp" />
     <ClCompile Include="Helper.cpp" />
     <ClCompile Include="Logger.cpp" />
-    <ClCompile Include="ReadDirectoryChanges\ReadDirectoryChanges.cpp" />
-    <ClCompile Include="ReadDirectoryChanges\ReadDirectoryChangesPrivate.cpp" />
     <ClCompile Include="Registry.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TrayManager.cpp" />
-    <ClCompile Include="WhatsAppApi.cpp" />
     <ClCompile Include="WhatsappTray.cpp" />
     <ClCompile Include="WinSockServer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AboutDialog.h" />
     <ClInclude Include="AppData.h" />
-    <ClInclude Include="DirectoryWatcher.h" />
     <ClInclude Include="Enum.h" />
     <ClInclude Include="Helper.h" />
     <ClInclude Include="Logger.h" />
-    <ClInclude Include="ReadDirectoryChanges\ReadDirectoryChanges.h" />
-    <ClInclude Include="ReadDirectoryChanges\ReadDirectoryChangesPrivate.h" />
-    <ClInclude Include="ReadDirectoryChanges\ThreadSafeQueue.h" />
     <ClInclude Include="Registry.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="TrayManager.h" />
-    <ClInclude Include="WhatsAppApi.h" />
     <ClInclude Include="WhatsappTray.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="WindowsMessage.h" />
