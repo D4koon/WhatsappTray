@@ -5,6 +5,7 @@
 #include "WindowsMessage.h"
 #include "WinSockLogger.h"
 
+#include "inttypes.h"
 #include <iostream>
 #include <sstream>
 #include <windows.h>
@@ -57,6 +58,7 @@ static std::string WideToUtf8(const std::wstring& inputString);
 static std::string GetEnviromentVariable(const std::string& inputString);
 static POINT LParamToPoint(LPARAM lParam);
 static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam = 0, LPARAM lParam = 0);
+static bool BlockShowWindowFunction();
 
 static void StartInitThread();
 
@@ -108,7 +110,7 @@ DWORD WINAPI Init(LPVOID lpParam)
 
 	auto filepath = GetFilepathFromProcessID(_processID);
 
-	/* LoadLibrary()triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
+	/* LoadLibrary() triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
 	 * to prevent tirggering the wndProc redirect for WhatsappTray we need to detect if this happend.
 	 * the easiest/best way to detect that is by setting a enviroment variable before LoadLibrary() */
 	auto envValue = GetEnviromentVariable(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR);
@@ -141,6 +143,11 @@ DWORD WINAPI Init(LPVOID lpParam)
 	// Our window-proc will call after the processing the original window-proc.
 	_originalWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtr(_whatsAppWindowHandle, GWLP_WNDPROC, (LONG_PTR)RedirectedWndProc));
 
+	if (BlockShowWindowFunction() == true) {
+		// Notify WhatsAppTray that ShowWindow-function is blocked and the minmizing can be done if needed.
+		SendMessageToWhatsappTray(WM_WHATSAPP_SHOWWINDOW_BLOCKED, 0, 0);
+	}
+	
 	return 0;
 }
 
@@ -423,6 +430,48 @@ static POINT LParamToPoint(LPARAM lParam)
 static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	return PostMessage(FindWindow(NAME, NAME), message, wParam, lParam);
+}
+
+/**
+ * @brief Block the ShowWindow()-function so that WhatsApp can no longer call it.
+ *        This is done because otherwise it messes with the start-minimized-feature of WhatsappTray
+ * 
+ *        Normaly WhatsApp calls ShowWindow() shortly before it is finished with initialization.
+ */
+static bool BlockShowWindowFunction()
+{
+	// Get the User32.dll-handle
+	auto hLib = LoadLibrary("User32.dll");
+	if (hLib == NULL) {
+		LogString("Error loading User32.dll");
+		return false;
+	}
+	LogString("loading User32.dll finished");
+
+	// Get the address of the ShowWindow()-function of the User32.dll
+	auto showWindowFunc = (HOOKPROC)GetProcAddress(hLib, "ShowWindow");
+	if (showWindowFunc == NULL) {
+		LogString("The function 'ShowWindow' was NOT found");
+		return false;
+	}
+	LogString("The function 'ShowWindow' was NOT found (0x%" PRIx64 ")", showWindowFunc);
+
+	// Change the protection-level of this memory-region, because it normaly has read,execute
+	// NOTE: If this is not done WhatsApp will crash!
+	DWORD oldProtect;
+	if (VirtualProtect(showWindowFunc, 20, PAGE_EXECUTE_READWRITE, &oldProtect) == NULL) {
+		return false;
+	}
+
+	// Write 0xC3 to the first byte of the function
+	// This translate to a "RET"-command so the function will immediatly return instead of the normal jmp-command
+	*((INT8*)showWindowFunc) = 0xC3;
+
+	// Read the first byte of the ShowWindow()-function to see that it has worked
+	auto showWindowFunc_FirstByte = *((INT8*)showWindowFunc);
+	LogString("First byte of the ShowWindow()-function =0x%" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
+
+	return true;
 }
 
 /**
