@@ -313,3 +313,36 @@ std::string Helper::GetWindowTitle(const HWND hwnd)
 
 	return std::string(windowNameBuffer);
 }
+
+/**
+ * @brief Create a process.
+ */
+PROCESS_INFORMATION Helper::StartProcess(std::string exePath)
+{
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	// Add quotes so a path with spaces can be used
+	auto cmdLine = ("\"" + exePath + "\"");
+
+	// Start the process. 
+	if (!CreateProcess(NULL,    // No module name (use command line)
+		(LPSTR)cmdLine.c_str(), // Command line
+		NULL,                   // Process handle not inheritable
+		NULL,                   // Thread handle not inheritable
+		FALSE,                  // Set handle inheritance to FALSE
+		0,                      // No creation flags
+		NULL,                   // Use parent's environment block
+		NULL,                   // Use parent's starting directory 
+		&si,                    // Pointer to STARTUPINFO structure
+		&pi)                    // Pointer to PROCESS_INFORMATION structure
+		) {
+		Logger::Info("CreateProcess failed(%d).", GetLastError());
+	}
+
+	return pi;
+}

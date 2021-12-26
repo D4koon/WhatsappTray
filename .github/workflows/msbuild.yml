@@ -1,0 +1,69 @@
+name: MSBuild
+
+on: [push]
+
+env:
+  # Path to the solution file relative to the root of the project.
+  SOLUTION_FILE_PATH: .
+
+  # Configuration type to build.
+  # You can convert this to a build matrix if you need coverage of multiple configuration types.
+  # https://docs.github.com/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+  BUILD_CONFIGURATION: Release
+  
+  APPLICATION_NAME_SUFFIX: " DEBUG "
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.2
+
+    - name: Restore NuGet packages
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: nuget restore ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Build
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      # Add additional options to the MSBuild command line here (like platform or verbosity level).
+      # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
+      run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}}
+
+    - name: Set WA_TRAY_VERSION env-variable
+      run: cat <(echo -n "WA_TRAY_VERSION=") <(sed -n "s/^.*#define MAJOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define MINOR \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') <(echo -n ".") <(sed -n "s/^.*#define PATCH \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') >> $GITHUB_ENV
+      shell: bash
+      
+    - name: Set WA_TRAY_VERSION_IS_DEBUG env-variable
+      run: cat <(echo -n "WA_TRAY_VERSION_IS_DEBUG=") <(sed -n "s/^.*#define IS_DEBUG \([0-9]\).*$/\1/p" WhatsappTray/Version.rc2 | tr -d '\n') >> $GITHUB_ENV
+      shell: bash
+
+    - name: Show WhatsappTray-version
+      run: echo ${{env.WA_TRAY_VERSION}}
+      shell: bash
+      
+      # NOTE: The space here is on purpose because after much trying i could not set the env-var to an empty string
+    - name: Set application-name-suffix
+      if: ${{ env.WA_TRAY_VERSION_IS_DEBUG == '0' }}
+      run: echo "APPLICATION_NAME_SUFFIX= " >> $GITHUB_ENV
+      shell: bash
+
+    # === Archive ===
+    - name: Archive WhatsappTray binaries (WhatsappTray.exe and Hook.dll)
+      uses: actions/upload-artifact@v2
+      with:
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}}binaries (WhatsappTray.exe and Hook.dll)
+        path: |
+          bin/Release/WhatsappTray.exe
+          bin/Release/Hook.dll
+        
+    - name: Package WhatsappTray as installer
+      run: setup_creator_binaries/ISCC.exe "setupBuildfile.iss"
+
+    - name: Archive WhatsappTray Installer
+      uses: actions/upload-artifact@v2
+      with:
+        name: WhatsappTray ${{env.WA_TRAY_VERSION}}${{env.APPLICATION_NAME_SUFFIX}}installer
+        path: Output/*.exe

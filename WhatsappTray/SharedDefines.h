@@ -20,6 +20,7 @@
 #define WM_WHAHTSAPP_CLOSING  0x0405
 #define WM_WHATSAPP_API_NEW_MESSAGE  0x0407
 #define WM_WHATSAPP_TO_WHATSAPPTRAY_RECEIVED_WM_CLOSE  0x0408 /* WhatsApp received a WM_CLOSE-message. This message is ment to be sent from the hook inside WhatsApp */
+#define WM_WHATSAPP_SHOWWINDOW_BLOCKED  0x0409 /* The hook sucessfully blocked the ShowWindow()-function. */
 #define WM_WHATSAPPTRAY_TO_WHATSAPP_SEND_WM_CLOSE  0x8000 - 100 /* This message is ment to send to the Whatsapp-window and the hook processes it and should close Whatsapp */
 #define IDM_RESTORE 0x1001
 #define IDM_CLOSE   0x1002

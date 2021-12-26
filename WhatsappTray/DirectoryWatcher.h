@@ -24,6 +24,7 @@
 #include <string>
 #include <thread>
 #include <windef.h>
+#include <functional>
 
 class DirectoryWatcher
 {

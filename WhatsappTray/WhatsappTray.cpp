@@ -8,7 +8,6 @@
 
 #include "AppData.h"
 #include "Registry.h"
-#include "WhatsAppApi.h"
 #include "TrayManager.h"
 #include "AboutDialog.h"
 #include "WinSockServer.h"
@@ -19,7 +18,7 @@
 #include <Strsafe.h>
 #include <filesystem>
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 #ifdef _DEBUG
 constexpr auto CompileConfiguration = "Debug";
@@ -74,8 +73,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	});
 
 	_winsockThread = std::thread(SocketStart, _loggerPort);
-
-	WhatsAppApi::Init();
 
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
@@ -271,6 +268,16 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		}
 
 	} break;
+	case WM_WHATSAPP_SHOWWINDOW_BLOCKED: {
+
+		LogInfo("WM_WHATSAPP_SHOWWINDOW_BLOCKED");
+		
+		if (AppData::StartMinimized.Get()) {
+			LogInfo("MinimizeWindowToTray");
+			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
+		}
+
+	} break;
 	default: {
 		if (msg == s_uTaskbarRestart) {
 			_trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
@@ -290,18 +297,6 @@ static bool InitWhatsappTray()
 	// Setup the settings for launch on windows startup.
 	SetLaunchOnWindowsStartupSetting(AppData::LaunchOnWindowsStartup.Get());
 
-	if (AppData::StartMinimized.Get()) {
-		LogInfo("Prepare for starting minimized.");
-
-		WhatsAppApi::NotifyOnFullInit([]() {
-			LogInfo("NotifyOnFullInit");
-			Sleep(2000);
-			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
-			// Remove event after the first execution
-			WhatsAppApi::NotifyOnFullInit(NULL);
-			});
-	}
-
 	// TrayManager needs to be ready before WhatsApp is started to handle 'start minimized'
 	_trayManager = std::make_unique<TrayManager>(_hwndWhatsappTray);
 
@@ -316,9 +311,6 @@ static bool InitWhatsappTray()
 		LogError("Error setting hook.");
 		return false;
 	}
-
-	// Send a WM_WHATSAPP_API_NEW_MESSAGE-message when a new WhatsApp-message has arrived.
-	WhatsAppApi::NotifyOnNewMessage([]() { PostMessageA(_hwndWhatsappTray, WM_WHATSAPP_API_NEW_MESSAGE, 0, 0); });
 
 	return true;
 }
@@ -352,38 +344,14 @@ static HWND StartWhatsapp()
 		LogInfo("Resolved .lnk (Shortcut) to:'" + waStartPathString + "'");
 	}
 
-	STARTUPINFO si;
-	PROCESS_INFORMATION pi;
+	auto pi = Helper::StartProcess(waStartPathString);
 
-	ZeroMemory(&si, sizeof(si));
-	si.cb = sizeof(si);
-	ZeroMemory(&pi, sizeof(pi));
-
-	// Add quotes so a path with spaces can be used
-	auto cmdLine = ("\"" + waStartPathString + "\"");
-
-	// Start the process. 
-	if (!CreateProcess(NULL,    // No module name (use command line)
-		(LPSTR)cmdLine.c_str(), // Command line
-		NULL,                   // Process handle not inheritable
-		NULL,                   // Thread handle not inheritable
-		FALSE,                  // Set handle inheritance to FALSE
-		0,                      // No creation flags
-		NULL,                   // Use parent's environment block
-		NULL,                   // Use parent's starting directory 
-		&si,                    // Pointer to STARTUPINFO structure
-		&pi)                    // Pointer to PROCESS_INFORMATION structure
-		)
-	{
-		LogInfo("CreateProcess failed(%d).", GetLastError());
-		return nullptr;
-	}
-
-	// Wait a maximum of 10 seconds for the process to go into idle.
-	auto result = WaitForInputIdle(pi.hProcess, 10000);
+	// Wait a maximum of 120 seconds for the process to go into idle.
+	auto result = WaitForInputIdle(pi.hProcess, 120000);
 	if (result != 0)
 	{
-		LogInfo("WaitForInputIdle failed.");
+		MessageBoxA(NULL, "WhatsApp-Process still in idle after 120 seconds. Aborting start of WhatsappTray", "WhatsappTray", MB_OK | MB_ICONERROR);
+		LogError("WhatsApp-Process still in idle after 120 seconds. Aborting start of WhatsappTray. (WaitForInputIdle failed)");
 		return nullptr;
 	}
 
@@ -393,10 +361,11 @@ static HWND StartWhatsapp()
 	// - Normally the exe referenced by the shortcut spawns the real program(exe).
 	//   So it is necessary to find the child-process of the original process.
 
-	 // Wait for WhatsApp to be started.
-	Sleep(100);
-	for (int attemptN = 0; (_hwndWhatsapp = FindWhatsapp()) == NULL; ++attemptN) {
-		if (attemptN > 60) {
+	 // Wait for WhatsApp-window to be found.
+	for (int attemptN = 0; _hwndWhatsapp == NULL; ++attemptN) {
+		_hwndWhatsapp = FindWhatsapp();
+
+		if (attemptN > 240) {
 			MessageBoxA(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
 			return nullptr;
 		}
@@ -598,7 +567,7 @@ static bool SetHook()
 
 	// For the case when this function is called multiple times, check if the dll is already loaded
 	if (_hLib == NULL) {
-		/* LoadLibrary()triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
+		/* LoadLibrary() triggers DllMain with DLL_PROCESS_ATTACH. This is used in WhatsappTray.cpp
 		 * to prevent tirggering the wndProc redirect for WhatsappTray we need to detect if this happend.
 		 * the easiest/best way to detect that is by setting a enviroment variable before LoadLibrary() */
 		_putenv_s(WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR, WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE);
@@ -617,7 +586,7 @@ static bool SetHook()
 		return false;
 	}
 
-	_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, (HOOKPROC)CallWndRetProc, _hLib, threadId);
+	_hWndProc = SetWindowsHookEx(WH_CALLWNDPROC, CallWndRetProc, _hLib, threadId);
 	if (_hWndProc == NULL) {
 		LogError("Error Creation Hook _hWndProc");
 		UnRegisterHook();

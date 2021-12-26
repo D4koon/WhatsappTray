@@ -7,6 +7,7 @@
 #include <string>
 #include <map>
 #include <thread>
+#include <functional>
 
 BETTER_ENUM(Data, uint8_t, 
 	CLOSE_TO_TRAY,
@@ -131,14 +132,11 @@ public:
 	static DataEntryS<SBool> CloseToTrayWithEscape;
 
 	static std::string WhatsappStartpathGet();
-	static std::string WhatsappRoamingDirectoryGet();
 private:
 	AppData() {}
 
 	// NOTE: UTF8-string.
 	static DataEntryS<SString> WhatsappStartpath;
-	// NOTE: UTF8-string.
-	static DataEntryS<SString> WhatsappRoamingDirectory;
 
 	static std::string GetAppDataFilePath();
 	
