@@ -30,5 +30,6 @@ public:
 	static std::string ResolveLnk(HWND hwnd, LPCSTR lpszLinkFile);
 	static std::string GetFilepathFromProcessID(DWORD processId);
 	static std::string GetWindowTitle(const HWND hwnd);
+	static PROCESS_INFORMATION Helper::StartProcess(std::string exePath);
 };
 
