@@ -525,11 +525,11 @@ static void ExecuteMenu()
 	}
 
 	// -- Show unread messages.
-	if (AppData::ShowUnreadMessages.Get()) {
-		AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages (experimental)");
-	} else {
-		AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages (experimental)");
-	}
+	//if (AppData::ShowUnreadMessages.Get()) {
+	//	AppendMenu(hMenu, MF_CHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages (experimental)");
+	//} else {
+	//	AppendMenu(hMenu, MF_UNCHECKED, IDM_SETTING_SHOW_UNREAD_MESSAGES, "Show Unread Messages (experimental)");
+	//}
 
 	// -- Close to tray with escape key.
 	if (AppData::CloseToTrayWithEscape.Get()) {
