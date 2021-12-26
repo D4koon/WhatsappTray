@@ -47,7 +47,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static bool InitWhatsappTray();
 static HWND StartWhatsapp();
-static HWND FindWhatsapp();
+static HWND FindWhatsappWindowHandle();
 static void TryClosePreviousWhatsappTrayInstance();
 static bool CreateWhatsappTrayWindow();
 static void ExecuteMenu();
@@ -273,7 +273,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		LogInfo("WM_WHATSAPP_SHOWWINDOW_BLOCKED");
 		
 		if (AppData::StartMinimized.Get()) {
-			LogInfo("MinimizeWindowToTray");
+			LogInfo("MinimizeWindowToTray becauses start minimized (2)");
 			_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 		}
 
@@ -303,6 +303,12 @@ static bool InitWhatsappTray()
 	if (StartWhatsapp() == nullptr) {
 		MessageBoxA(NULL, "Error launching WhatsApp. Examine the logs for details", "WhatsappTray", MB_OK);
 		return false;
+	}
+
+	if (AppData::StartMinimized.Get()) {
+		// To be as minimal visible as possible, already minimize WhatsApp here and later again after ShowWindow is disabled in the hook. See (2)
+		LogInfo("MinimizeWindowToTray becauses start minimized (1)");
+		_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 	}
 
 	_trayManager->RegisterWindow(_hwndWhatsapp);
@@ -346,15 +352,6 @@ static HWND StartWhatsapp()
 
 	auto pi = Helper::StartProcess(waStartPathString);
 
-	// Wait a maximum of 120 seconds for the process to go into idle.
-	auto result = WaitForInputIdle(pi.hProcess, 120000);
-	if (result != 0)
-	{
-		MessageBoxA(NULL, "WhatsApp-Process still in idle after 120 seconds. Aborting start of WhatsappTray", "WhatsappTray", MB_OK | MB_ICONERROR);
-		LogError("WhatsApp-Process still in idle after 120 seconds. Aborting start of WhatsappTray. (WaitForInputIdle failed)");
-		return nullptr;
-	}
-
 	// We want to find the window-handle of WhatsApp
 	// - The hard thing here is to find the window-handle even if WhatsApp was already running when CreateProcess() was called.
 	//   This means we can not really rely on the data (STARTUPINFO and PROCESS_INFORMATION) from CreateProcess()
@@ -362,15 +359,19 @@ static HWND StartWhatsapp()
 	//   So it is necessary to find the child-process of the original process.
 
 	 // Wait for WhatsApp-window to be found.
-	for (int attemptN = 0; _hwndWhatsapp == NULL; ++attemptN) {
-		_hwndWhatsapp = FindWhatsapp();
+	for (int attemptCount = 0; _hwndWhatsapp == NULL; ++attemptCount) {
+		_hwndWhatsapp = FindWhatsappWindowHandle();
 
-		if (attemptN > 240) {
+		if (attemptCount > 1200) {
 			MessageBoxA(NULL, "WhatsApp-Window not found.", "WhatsappTray", MB_OK | MB_ICONERROR);
 			return nullptr;
 		}
-		LogInfo("WhatsApp-Window not found. Wait 500ms and retry.");
-		Sleep(500);
+
+		if (attemptCount % 10 == 9) {
+			LogInfo("WhatsApp-Window not found yet after 1000ms. Continue waiting ...");
+		}
+		
+		Sleep(100);
 	}
 
 	LogInfo("WhatsApp-Window found.");
@@ -385,7 +386,7 @@ static HWND StartWhatsapp()
  * 1. Get the path to the binary(exe) for the window with "WhatsApp" in the title
  * 2. Match it with the appData-setting.
  */
-static HWND FindWhatsapp()
+static HWND FindWhatsappWindowHandle()
 {
 	HWND iteratedHwnd = NULL;
 	while (true) {
