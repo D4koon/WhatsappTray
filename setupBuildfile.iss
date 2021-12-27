@@ -2,14 +2,16 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "WhatsappTray"
-#define MyAppVersion "1.8.0"
 #define MyAppURL "https://github.com/D4koon/WhatsappTray"
 #define MyAppExeName "WhatsappTray.exe"
+#define PathToExe "bin\Release\"
+#define MyAppVersion GetVersionNumbersString(PathToExe + MyAppExeName)
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
 ; Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
+SetupIconFile=compiler:SetupClassicIcon.ico
 AppId={{1237D679-445B-4101-B7EC-B5081C5FA4A3}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
@@ -17,7 +19,7 @@ AppVersion={#MyAppVersion}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={pf}\{#MyAppName}
+DefaultDirName={commonpf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputBaseFilename=WhatsappTrayV{#MyAppVersion}
 Compression=lzma
@@ -34,8 +36,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "{app}"; Permissions: users-full
  
 [Files]
-Source: "bin\Release\WhatsappTray.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "bin\Release\Hook.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PathToExe}WhatsappTray.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PathToExe}Hook.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
