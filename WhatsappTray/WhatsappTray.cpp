@@ -131,6 +131,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 #pragma WARNING(Move into TrayManager. Problem is executeMenue...)
 		switch (static_cast<UINT>(lParam)) {
 		case NIN_SELECT: {
+			// NOTE: If the icon is clicked to fast after the start of Whatsapptray (start minimized activated) this will not register, because WhatsApp is not finished loading...
+			LogInfo("Leftclick on trayicon IsWindowVisible=%d", IsWindowVisible(_hwndWhatsapp));
 			if (IsWindowVisible(_hwndWhatsapp) == false) {
 				_trayManager->RestoreWindowFromTray(_hwndWhatsapp);
 			} else {
