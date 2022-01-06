@@ -32,5 +32,6 @@ private:
 	void CreateTrayIcon(const int32_t index, const HWND hwnd);
 	int32_t GetIndexFromWindowHandle(const HWND hwnd);
 	HICON AddTextToIcon(HICON hBackgroundIcon, LPCSTR text);
+	HICON AddImageOverlayToIcon(HICON hBackgroundIcon, LPCSTR text);
 };
 

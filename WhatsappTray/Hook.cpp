@@ -10,6 +10,10 @@
 #include <sstream>
 #include <windows.h>
 #include <psapi.h> // OpenProcess()
+#include <shobjidl.h>   // For ITaskbarList3
+#include <ctime>
+#include <iomanip>
+#include <string>
 //#include <shellscalingapi.h> // For dpi-scaling stuff
 
 //#pragma comment(lib, "SHCore") // For dpi-scaling stuff
@@ -31,6 +35,11 @@ constexpr char* MODULE_NAME = "WhatsappTrayHook";
 static DWORD _processID = NULL;
 static HWND _whatsAppWindowHandle = NULL;
 static WNDPROC _originalWndProc = NULL;
+
+static ITaskbarList3* _pTaskbarList = nullptr;   // careful, COM objects should only be accessed from apartment they are created in
+
+static std::string _whatsappTrayPath;
+static uint32_t _iconCounter = 1; // Start with 1 so 0 can be the signal for no new message
 
 static UINT _dpiX; /* The horizontal dpi-size. Is set in Windows settings. Default 100% = 96 */
 static UINT _dpiY; /* The vertical dpi-size. Is set in Windows settings. Default 100% = 96 */
@@ -62,6 +71,21 @@ static bool BlockShowWindowFunction();
 
 static void StartInitThread();
 
+
+extern "C" int ReturnRdx();
+extern "C" int ReturnRcx();
+extern "C" int ReturnRdi();
+extern "C" int ReturnR8();
+extern "C" int ReturnR9();
+
+bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName);
+
+std::string GetWhatsappTrayPath();
+std::string GetTimestamp();
+intptr_t GetSetOverlayIconMemoryAddress();
+bool WriteJumpToFunction(PVOID address, char* pDummyFunctionAddr);
+void DummyFunction();
+
 /**
  * @brief The entry point for the dll
  * 
@@ -90,6 +114,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		// All threads should be terminated already?
 		// Anyway without stopping a messagebox with an error will appear.
 		SocketStop();
+
+		// Cleanup COM-lib usage (for _pTaskbarList)
+		CoUninitialize();
 
 	} break;
 	}
@@ -147,7 +174,36 @@ DWORD WINAPI Init(LPVOID lpParam)
 		// Notify WhatsAppTray that ShowWindow-function is blocked and the minmizing can be done if needed.
 		SendMessageToWhatsappTray(WM_WHATSAPP_SHOWWINDOW_BLOCKED, 0, 0);
 	}
-	
+
+
+
+
+	_whatsappTrayPath = GetWhatsappTrayPath();
+	if (_whatsappTrayPath.length() == 0) {
+		LogString("GetWhatsappTrayPath FAILED");
+		return 3;
+	}
+
+	LogString("_whatsappTrayPath=%s", _whatsappTrayPath.c_str());
+
+	HRESULT hrInit = CoInitialize(NULL);
+	if (FAILED(hrInit)) {
+		LogString("CoInitialize FAILED");
+		return 4;
+	}
+
+	auto dummyFunctionAddr = (intptr_t)DummyFunction;
+	auto pDummyFunctionAddr = (char*)&dummyFunctionAddr;
+	LogString("DummyFunction-adress=%llX.", DummyFunction);
+	LogString("Code= FF 25 00 00 00 00 %02hhX %02hhX %02hhX %02hhX %02hhX %02hhX %02hhX %02hhX", pDummyFunctionAddr[0], pDummyFunctionAddr[1], pDummyFunctionAddr[2], pDummyFunctionAddr[3], pDummyFunctionAddr[4], pDummyFunctionAddr[5], pDummyFunctionAddr[6], pDummyFunctionAddr[7]);
+
+	auto setOverlayIconMemoryAddress = (LPVOID)GetSetOverlayIconMemoryAddress();
+
+	// Write jump to dummy-function
+	if (WriteJumpToFunction(setOverlayIconMemoryAddress, pDummyFunctionAddr) == false) {
+		return 5;
+	}
+
 	return 0;
 }
 
@@ -158,6 +214,125 @@ DWORD WINAPI Init(LPVOID lpParam)
  */
 static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+	static UINT s_uTBBC = WM_NULL;
+
+	if (s_uTBBC == WM_NULL) {
+		LogString("RegisterWindowMessage");
+
+		// In case the application is run elevated, allow the
+		// TaskbarButtonCreated message through.
+		ChangeWindowMessageFilter(s_uTBBC, MSGFLT_ADD);
+
+		// Compute the value for the TaskbarButtonCreated message
+		s_uTBBC = RegisterWindowMessage("TaskbarButtonCreated");
+
+		// Normally you should wait until you get the message s_uTBBC, but that does not always work.
+		// Maybe because Whatsapp already registerd, and the message was already received and Windows does not notify again
+		// So we just run it always on startup
+		if (!_pTaskbarList) {
+			HRESULT hr = CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&_pTaskbarList));
+			if (SUCCEEDED(hr)) {
+				LogString("CoCreateInstance SUCCEEDED");
+
+
+
+				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+
+
+
+				hr = _pTaskbarList->HrInit();
+				if (FAILED(hr)) {
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+					LogString("CoCreateInstance FAILED");
+
+					_pTaskbarList->Release();
+					_pTaskbarList = NULL;
+				}
+			}
+		}
+
+	}
+
+	//if (uMsg == s_uTBBC) {
+	//	LogString("TaskbarButtonCreated message received");
+	//	// Once we get the TaskbarButtonCreated message, we can call methods
+	//	// specific to our window on a TaskbarList instance. Note that it's
+	//	// possible this message can be received multiple times over the lifetime
+	//	// of this window (if explorer terminates and restarts, for example).
+	//	if (!_pTaskbarList) {
+	//		HRESULT hr = CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&_pTaskbarList));
+	//		if (SUCCEEDED(hr)) {
+	//			LogString("CoCreateInstance SUCCEEDED");
+
+
+
+	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+
+
+
+	//			hr = _pTaskbarList->HrInit();
+	//			if (FAILED(hr)) {
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+	//				LogString("CoCreateInstance FAILED");
+
+	//				_pTaskbarList->Release();
+	//				_pTaskbarList = NULL;
+	//			}
+	//		}
+	//	}
+	//}
+	
+	
+	
+	
+	
+	
 	std::ostringstream traceBuffer;
 
 #ifdef _DEBUG
@@ -337,13 +512,13 @@ static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle)
 		DWORD processId;
 		DWORD threadId = GetWindowThreadProcessId(iteratedHwnd, &processId);
 
-		// Check processId and Title
-		// Already observerd an instance where the processId alone lead to an false match!
+		// Check waTrayProcessId and Title
+		// Already observerd an instance where the waTrayProcessId alone lead to an false match!
 		if (_processID != processId) {
-			// processId does not match -> continue looking
+			// waTrayProcessId does not match -> continue looking
 			continue;
 		}
-		// Found matching processId
+		// Found matching waTrayProcessId
 
 		if (iteratedHwnd != GetAncestor(iteratedHwnd, GA_ROOT)) {
 			//LogString("Window is not a toplevel-window");
@@ -378,7 +553,7 @@ static std::string GetWindowTitle(HWND hwnd)
 /**
  * @brief Get the path to the executable for the ProcessID
  * 
- * @param processId The ProcessID from which the path to the executable should be fetched
+ * @param waTrayProcessId The ProcessID from which the path to the executable should be fetched
  * @return The path to the executable from the ProcessID
 */
 static std::string GetFilepathFromProcessID(DWORD processId)
@@ -499,4 +674,253 @@ void StartInitThread()
 
 	// Close thread handle. NOTE(SAM): For now i do not clean up the thread handle because it shouldn't be such a big deal...
 	//CloseHandle(threadHandle);
+}
+
+bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName)
+{
+	DWORD dwPaletteSize = 0, dwBmBitsSize = 0, dwDIBSize = 0;
+	HDC hDC = CreateDC(TEXT("DISPLAY"), NULL, NULL, NULL);
+	int iBits = GetDeviceCaps(hDC, BITSPIXEL) * GetDeviceCaps(hDC, PLANES);
+	DeleteDC(hDC);
+
+	WORD wBitCount;
+	if (iBits <= 1) {
+		wBitCount = 1;
+	}
+	else if (iBits <= 4) {
+		wBitCount = 4;
+	}
+	else if (iBits <= 8) {
+		wBitCount = 8;
+	}
+	else {
+		wBitCount = 24;
+	}
+
+	BITMAP bitmap;
+	GetObject(hBitmap, sizeof(bitmap), (LPSTR)&bitmap);
+
+	BITMAPINFOHEADER bi;
+	bi.biSize = sizeof(BITMAPINFOHEADER);
+	bi.biWidth = bitmap.bmWidth;
+	bi.biHeight = -bitmap.bmHeight;
+	bi.biPlanes = 1;
+	bi.biBitCount = wBitCount;
+	bi.biCompression = BI_RGB;
+	bi.biSizeImage = 0;
+	bi.biXPelsPerMeter = 0;
+	bi.biYPelsPerMeter = 0;
+	bi.biClrImportant = 0;
+	bi.biClrUsed = 256;
+	dwBmBitsSize = ((bitmap.bmWidth * wBitCount + 31) & ~31) / 8 * bitmap.bmHeight;
+	HANDLE hDib = GlobalAlloc(GHND, dwBmBitsSize + dwPaletteSize + sizeof(BITMAPINFOHEADER));
+
+	LPBITMAPINFOHEADER lpbi = (LPBITMAPINFOHEADER)GlobalLock(hDib);
+	*lpbi = bi;
+
+	HANDLE hPal = GetStockObject(DEFAULT_PALETTE);
+	HANDLE hOldPal2 = NULL;
+	if (hPal) {
+		hDC = GetDC(NULL);
+		hOldPal2 = SelectPalette(hDC, (HPALETTE)hPal, FALSE);
+		RealizePalette(hDC);
+	}
+
+	GetDIBits(hDC, hBitmap, 0, (UINT)bitmap.bmHeight, (LPSTR)lpbi + sizeof(BITMAPINFOHEADER) + dwPaletteSize, (BITMAPINFO*)lpbi, DIB_RGB_COLORS);
+
+	if (hOldPal2) {
+		SelectPalette(hDC, (HPALETTE)hOldPal2, TRUE);
+		RealizePalette(hDC);
+		ReleaseDC(NULL, hDC);
+	}
+
+	HANDLE fh = CreateFile(lpszFileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+
+	if (fh == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+
+	BITMAPFILEHEADER bmfHdr;
+	bmfHdr.bfType = 0x4D42; // "BM"
+	dwDIBSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + dwPaletteSize + dwBmBitsSize;
+	bmfHdr.bfSize = dwDIBSize;
+	bmfHdr.bfReserved1 = 0;
+	bmfHdr.bfReserved2 = 0;
+	bmfHdr.bfOffBits = (DWORD)sizeof(BITMAPFILEHEADER) + (DWORD)sizeof(BITMAPINFOHEADER) + dwPaletteSize;
+
+	DWORD bytesWritten;
+	WriteFile(fh, (LPSTR)&bmfHdr, sizeof(BITMAPFILEHEADER), &bytesWritten, NULL);
+	WriteFile(fh, (LPSTR)lpbi, dwDIBSize, &bytesWritten, NULL);
+	LogString("Icon was written to file-path=%s", lpszFileName);
+
+	GlobalUnlock(hDib);
+	GlobalFree(hDib);
+	CloseHandle(fh);
+
+	return true;
+}
+
+std::string GetWhatsappTrayPath()
+{
+	std::string whatsappTrayPath = "";
+
+	auto waTrayHwnd = FindWindow(NAME, NAME);
+
+	DWORD waTrayProcessId;
+	auto waTrayThreadId = GetWindowThreadProcessId(waTrayHwnd, &waTrayProcessId);
+
+	auto waTrayProcessHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, waTrayProcessId);
+	if (waTrayProcessHandle == NULL) {
+		LogString("Failed to open process.");
+		return "";
+	}
+
+	char filename[MAX_PATH];
+	if (GetModuleFileNameEx(waTrayProcessHandle, NULL, filename, MAX_PATH) == 0) {
+		LogString("Failed to get module filename.");
+		return "";
+	}
+
+	CloseHandle(waTrayProcessHandle);
+
+	//LogString("Module filename is: %s", filename);
+	whatsappTrayPath = filename;
+
+	// Remove the exe-filename so we get the folder
+	whatsappTrayPath = whatsappTrayPath.substr(0, whatsappTrayPath.find_last_of('\\'));
+	
+	return whatsappTrayPath;
+}
+
+std::string GetTimestamp()
+{
+	std::string timestamp = "";
+
+	auto t = std::time(nullptr);
+	auto tm = *std::localtime(&t);
+
+	std::ostringstream oss;
+	oss << std::put_time(&tm, "%Y.%m.%d %H-%M-%S");
+	timestamp = oss.str();
+
+	LogString("timestamp=%s", timestamp.c_str());
+
+	return timestamp;
+}
+
+intptr_t GetSetOverlayIconMemoryAddress()
+{
+
+	HRESULT hr = CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&_pTaskbarList));
+	if (FAILED(hr)) {
+		LogString("CoCreateInstance FAILED");
+		return NULL;
+	}
+
+	//LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
+
+	// NOTE: For normal usage of this api, more initialization would be necessarie
+	//       but we only need the pointer to the _pTaskbarList to get to the vtable...
+	//       Normal usage can be seen here: https://github.com/microsoft/Windows-classic-samples/tree/main/Samples/Win7Samples/winui/shell/appshellintegration/TaskbarPeripheralStatus
+
+
+	auto iTaskbarList3_address = (intptr_t*)_pTaskbarList;
+	LogString("ITaskbarList3-class-address=0x%llX", iTaskbarList3_address);
+
+	auto iTaskbarList3_vtableAddress = (intptr_t*)iTaskbarList3_address[0];
+	LogString("iTaskbarList3_vtableAddress=0x%llX", iTaskbarList3_vtableAddress);
+
+	auto addressToSetOverlayIcon = iTaskbarList3_vtableAddress[18];
+	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
+	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
+	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
+	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
+	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
+	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
+	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
+	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
+	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
+
+	return addressToSetOverlayIcon;
+}
+
+/**
+ * @brief Write jump to dummy-function
+ *        With the following bytes:
+ *        FF 25 00 00 00 00 <dummyfunction-memory-address>
+*/
+bool WriteJumpToFunction(PVOID address, char* pDummyFunctionAddr)
+{
+	// Change the protection-level of this memory-region, because it normaly has read,execute
+	// NOTE: If this is not done WhatsApp will crash!
+	DWORD oldProtect;
+	if (VirtualProtect(address, 20, PAGE_EXECUTE_READWRITE, &oldProtect) == NULL) {
+		LogString("Failed to change protection-level of memorysection for jump to dummyfunction");
+		return false;
+	}
+
+	*(((UINT8*)address) + 0) = 0xFF;
+	*(((UINT8*)address) + 1) = 0x25;
+	*(((UINT8*)address) + 2) = 0x00;
+	*(((UINT8*)address) + 3) = 0x00;
+	*(((UINT8*)address) + 4) = 0x00;
+	*(((UINT8*)address) + 5) = 0x00;
+	*(((UINT8*)address) + 6) = pDummyFunctionAddr[0];
+	*(((UINT8*)address) + 7) = pDummyFunctionAddr[1];
+	*(((UINT8*)address) + 8) = pDummyFunctionAddr[2];
+	*(((UINT8*)address) + 9) = pDummyFunctionAddr[3];
+	*(((UINT8*)address) + 10) = pDummyFunctionAddr[4];
+	*(((UINT8*)address) + 11) = pDummyFunctionAddr[5];
+	*(((UINT8*)address) + 12) = pDummyFunctionAddr[6];
+	*(((UINT8*)address) + 13) = pDummyFunctionAddr[7];
+
+	return true;
+}
+
+void DummyFunction()
+{
+	// WARNING: The registers values have to be read before any other code is executed!
+	//          Otherwise it is likely that the values are overwritten
+	//auto rcxValue = ReturnRcx();
+	auto rdxValue = ReturnRdx();
+	//auto rdiValue = ReturnRdi();
+	auto r8Value = ReturnR8();
+	//auto r9Value = ReturnR9();
+
+	LogString("===DummyFunction-Called===");
+
+	// Get hicon-parameter
+	LogString("SetOverlayIcon() hicon-parameter=%llX (from r8-register)", r8Value);
+	// TODO: I think i have to clean up picInfo.hbmColor and the other bitmap, look in function description!!!
+	// TODO: I think i have to clean up picInfo.hbmColor and the other bitmap, look in function description!!!
+	// TODO: I think i have to clean up picInfo.hbmColor and the other bitmap, look in function description!!!
+	if (r8Value != NULL) {
+		LogString("New message(s)");
+
+		ICONINFO picInfo;
+		auto infoRet = GetIconInfo((HICON)r8Value, &picInfo);
+		LogString("GetIconInfo-returnvalue=%d", infoRet);
+
+		BITMAP bitmap{};
+		auto getObjectRet = GetObject(picInfo.hbmColor, sizeof(bitmap), &bitmap);
+		LogString("getObjectRet=%d widht=%d height=%d", getObjectRet, bitmap.bmWidth, bitmap.bmHeight);
+
+		// Create new bitmaps for every function-call so to avoid errors due to race conditions
+		// Because the read from WhatsappTray is not synchronized with the writing from the hook.
+		SaveHBITMAPToFile(picInfo.hbmColor, (_whatsappTrayPath + std::string("\\unread_messages_") + std::to_string(_iconCounter) + ".bmp").c_str());
+
+		// Notify WhatsappTray that a new bitmap(icon) is ready
+		SendMessageToWhatsappTray(WM_WHATSAPP_API_NEW_MESSAGE, _iconCounter, NULL);
+	}
+	else {
+		LogString("No new messages");
+		
+		SendMessageToWhatsappTray(WM_WHATSAPP_API_NEW_MESSAGE, 0, NULL);
+	}
+
+	// Get hwnd-parameter
+	// NOTE: This should be the hwnd of the WhatsApp-Window
+	LogString("SetOverlayIcon() hwnd-parameter=%llX (from rdx-register)", rdxValue);
+
+	// TODO: Call the original function to get icon-overlay also in the taskbar
 }

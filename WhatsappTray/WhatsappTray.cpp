@@ -36,8 +36,6 @@ static HWND _hwndWhatsapp = NULL; /* Handle to the window of WhatsApp */
 static HHOOK _hWndProc = NULL; /* Handle to the Hook from SetWindowsHookEx() */
 static HMODULE _hLib = NULL; /* Handle to the Hook.dll */
 
-static int _messagesSinceMinimize = 0;
-
 static char _loggerPort[] = LOGGER_PORT;
 static std::thread _winsockThread;
 
@@ -212,6 +210,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 				_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 			}
 		}
+
+		_trayManager->SetIcon(_hwndWhatsapp, "");
 	} break;
 	case WM_WHAHTSAPP_CLOSING: {
 		LogInfo("WM_WHAHTSAPP_CLOSING");
@@ -260,14 +260,16 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 	} break;
 	case WM_WHATSAPP_API_NEW_MESSAGE: {
 
-		LogInfo("WM_WHATSAPP_API_NEW_MESSAGE");
-		_messagesSinceMinimize++;
+		LogInfo("WM_WHATSAPP_API_NEW_MESSAGE wparam=%d", wParam);
 
-		if (AppData::ShowUnreadMessages.Get()) {
-			char messagesSinceMinimizeBuffer[20] = { 0 };
-			snprintf(messagesSinceMinimizeBuffer, sizeof(messagesSinceMinimizeBuffer), "%d", _messagesSinceMinimize);
-			_trayManager->SetIcon(_hwndWhatsapp, messagesSinceMinimizeBuffer);
+		//if (AppData::ShowUnreadMessages.Get()) {
+		if (wParam != 0) {
+			// New message(s)
+			_trayManager->SetIcon(_hwndWhatsapp, std::to_string(wParam).c_str());
+		} else {
+			_trayManager->SetIcon(_hwndWhatsapp, "");
 		}
+		//}
 
 	} break;
 	case WM_WHATSAPP_SHOWWINDOW_BLOCKED: {
@@ -376,7 +378,7 @@ static HWND StartWhatsapp()
 		Sleep(100);
 	}
 
-	LogInfo("WhatsApp-Window found.");
+	LogInfo("WhatsApp-Window found. hwnd=%X", _hwndWhatsapp);
 
 	return _hwndWhatsapp;
 }

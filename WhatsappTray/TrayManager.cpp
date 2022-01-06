@@ -143,14 +143,19 @@ void TrayManager::RestoreWindowFromTray(const HWND hwnd)
 
 void TrayManager::SetIcon(const HWND hwnd, LPCSTR text)
 {
+	Logger::Info(MODULE_NAME "SetIcon use bitmap with id(%s)", text);
+
 	int32_t index = GetIndexFromWindowHandle(hwnd);
 	if (index == -1) {
 		return;
 	}
 
 	HICON waIcon = Helper::GetWindowIcon(hwnd);
+	auto trayIcon = waIcon;
 
-	HICON iconWithText = AddTextToIcon(waIcon, text);
+	if (lstrlen(text) > 0) {
+		trayIcon = AddImageOverlayToIcon(waIcon, (std::string("C:\\project\\WhatsappTray\\bin\\Debug\\unread_messages_") + text + ".bmp").c_str());
+	}
 
 	NOTIFYICONDATA nid;
 	ZeroMemory(&nid, sizeof(nid));
@@ -159,12 +164,15 @@ void TrayManager::SetIcon(const HWND hwnd, LPCSTR text)
 	nid.uID = static_cast<UINT>(index);
 	nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
 	nid.uCallbackMessage = WM_TRAYCMD;
-	nid.hIcon = iconWithText;
+	nid.hIcon = trayIcon;
 	GetWindowText(hwnd, nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
 	nid.uVersion = NOTIFYICON_VERSION;
 	Shell_NotifyIcon(NIM_MODIFY, &nid);
 
-	::DestroyIcon(iconWithText);
+	if (lstrlen(text) > 0) {
+		// Only destroy the icon when we created it (Through AddImageOverlayToIcon)
+		::DestroyIcon(trayIcon);
+	}
 }
 
 int32_t TrayManager::GetIndexFromWindowHandle(const HWND hwnd)
@@ -199,7 +207,7 @@ HICON TrayManager::AddTextToIcon(HICON hBackgroundIcon, LPCSTR text)
 	// Load up background icon
 	ICONINFO ii = { 0 };
 	//GetIconInfo creates bitmaps for the hbmMask and hbmColor members of ICONINFO.
-	//WARNING(TODO): The calling application must manage these bitmaps and delete them when they are no longer necessary.!!!!
+	//WARNING: The calling application must manage these bitmaps and delete them when they are no longer necessary.!!!!
 	::GetIconInfo(hBackgroundIcon, &ii);
 
 	//BITMAP bm;
@@ -226,6 +234,54 @@ HICON TrayManager::AddTextToIcon(HICON hBackgroundIcon, LPCSTR text)
 	}
 
 	graphics.DrawString(Helper::Utf8ToWide(text).c_str(), -1, &font, pointF, &brush);
+
+	::SelectObject(hMemDC, hOldBmp);
+
+	// Use new icon bitmap with text and new mask bitmap with text
+	ICONINFO ii2 = { 0 };
+	ii2.fIcon = TRUE;
+	ii2.hbmMask = ii.hbmMask;
+	ii2.hbmColor = ii.hbmColor;
+
+	// Create updated icon
+	HICON iconWithText = ::CreateIconIndirect(&ii2);
+
+	// Delete background icon bitmap info
+	::DeleteObject(ii.hbmColor);
+	::DeleteObject(ii.hbmMask);
+
+	::DeleteDC(hMemDC);
+	::ReleaseDC(NULL, hDc);
+
+	return iconWithText;
+}
+
+HICON TrayManager::AddImageOverlayToIcon(HICON hBackgroundIcon, LPCSTR text)
+{
+	// Load up background icon
+	ICONINFO ii = { 0 };
+	//GetIconInfo creates bitmaps for the hbmMask and hbmColor members of ICONINFO.
+	//WARNING: The calling application must manage these bitmaps and delete them when they are no longer necessary.!!!!
+	::GetIconInfo(hBackgroundIcon, &ii);
+
+	HDC hDc = ::GetDC(NULL);
+	HDC hMemDC = ::CreateCompatibleDC(hDc);
+
+	HGDIOBJ hOldBmp = ::SelectObject(hMemDC, ii.hbmColor);
+
+	auto bitmap = Bitmap::FromFile(Helper::Utf8ToWide(text).c_str());
+
+	Graphics graphics(hMemDC);
+
+	// Set black as transparent (don't copy black pixels with DrawImage)
+	Gdiplus::ImageAttributes attr;
+	attr.SetColorKey(Gdiplus::Color::Black, Gdiplus::Color::Black, Gdiplus::ColorAdjustTypeBitmap);
+
+	// Set x/y-postion and size where the image should be copied to.
+	const Gdiplus::Rect rect(10, 10, 20, 20);
+	graphics.DrawImage(bitmap, rect, 0, 0, bitmap->GetWidth(), bitmap->GetHeight(), Gdiplus::Unit::UnitPixel, &attr);
+
+	delete bitmap;
 
 	::SelectObject(hMemDC, hOldBmp);
 
