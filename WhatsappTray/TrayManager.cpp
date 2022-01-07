@@ -8,6 +8,7 @@
 #include "Logger.h"
 #include "WhatsappTray.h"
 #include "SharedDefines.h"
+#include <filesystem>
 
 using namespace Gdiplus;
 
@@ -143,7 +144,7 @@ void TrayManager::RestoreWindowFromTray(const HWND hwnd)
 
 void TrayManager::SetIcon(const HWND hwnd, LPCSTR text)
 {
-	Logger::Info(MODULE_NAME "SetIcon use bitmap with id(%s)", text);
+	Logger::Info(MODULE_NAME "SetIcon() Use bitmap with id(%s)", text);
 
 	int32_t index = GetIndexFromWindowHandle(hwnd);
 	if (index == -1) {
@@ -154,7 +155,13 @@ void TrayManager::SetIcon(const HWND hwnd, LPCSTR text)
 	auto trayIcon = waIcon;
 
 	if (lstrlen(text) > 0) {
-		trayIcon = AddImageOverlayToIcon(waIcon, (std::string("C:\\project\\WhatsappTray\\bin\\Debug\\unread_messages_") + text + ".bmp").c_str());
+		std::string appDirectory = Helper::GetApplicationDirectory();
+		auto messageCountBitmapPath = appDirectory + std::string("unread_messages_") + text + ".bmp";
+		if (std::filesystem::exists(messageCountBitmapPath) == false) {
+			Logger::Info(MODULE_NAME "SetIcon() Could not find message-count-bitmap in '%s'", messageCountBitmapPath.c_str());
+		} else {
+			trayIcon = AddImageOverlayToIcon(waIcon, messageCountBitmapPath.c_str());
+		}
 	}
 
 	NOTIFYICONDATA nid;

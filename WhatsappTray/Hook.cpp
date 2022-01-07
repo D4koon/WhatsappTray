@@ -911,6 +911,7 @@ void DummyFunction()
 
 		// Notify WhatsappTray that a new bitmap(icon) is ready
 		SendMessageToWhatsappTray(WM_WHATSAPP_API_NEW_MESSAGE, _iconCounter, NULL);
+		_iconCounter++;
 	}
 	else {
 		LogString("No new messages");
