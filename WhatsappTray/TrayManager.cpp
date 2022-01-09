@@ -148,6 +148,7 @@ void TrayManager::UpdateIcon(uint64_t id)
 			std::filesystem::remove(lastMessageCountBitmapPath);
 		}
 
+		// Add the message-count-icon from WhatsApp to the normal icon
 		auto messageCountBitmapPath = appDirectory + std::string("unread_messages_") + std::to_string(id) + ".bmp";
 		if (std::filesystem::exists(messageCountBitmapPath) == false) {
 			Logger::Info(MODULE_NAME "UpdateIcon() Could not find message-count-bitmap in '%s'", messageCountBitmapPath.c_str());

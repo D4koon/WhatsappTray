@@ -8,12 +8,10 @@
 #include "inttypes.h"
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <windows.h>
 #include <psapi.h> // OpenProcess()
 #include <shobjidl.h>   // For ITaskbarList3
-#include <ctime>
-#include <iomanip>
-#include <string>
 //#include <shellscalingapi.h> // For dpi-scaling stuff
 
 //#pragma comment(lib, "SHCore") // For dpi-scaling stuff
@@ -32,20 +30,7 @@ constexpr char* MODULE_NAME = "WhatsappTrayHook";
 
 #define DLLIMPORT __declspec(dllexport)
 
-static DWORD _processID = NULL;
-static HWND _whatsAppWindowHandle = NULL;
-static WNDPROC _originalWndProc = NULL;
-
-static ITaskbarList3* _pTaskbarList = nullptr;   // careful, COM objects should only be accessed from apartment they are created in
-static intptr_t _setOverlayIconMemoryAddress;
-
-static std::string _whatsappTrayPath;
-static uint64_t _iconCounter = 1; // Start with 1 so 0 can be the signal for no new message
-
-static UINT _dpiX; /* The horizontal dpi-size. Is set in Windows settings. Default 100% = 96 */
-static UINT _dpiY; /* The vertical dpi-size. Is set in Windows settings. Default 100% = 96 */
-
-
+// For dpi-scaling
 typedef enum MONITOR_DPI_TYPE {
 	MDT_EFFECTIVE_DPI = 0,
 	MDT_ANGULAR_DPI = 1,
@@ -53,7 +38,18 @@ typedef enum MONITOR_DPI_TYPE {
 	MDT_DEFAULT = MDT_EFFECTIVE_DPI
 } MONITOR_DPI_TYPE;
 
-typedef HRESULT (STDAPICALLTYPE* GetDpiForMonitorFunc)(HMONITOR, MONITOR_DPI_TYPE, UINT*, UINT*);
+static DWORD _processID = NULL;
+static HWND _whatsAppWindowHandle = NULL;
+static WNDPROC _originalWndProc = NULL;
+
+static std::string _whatsappTrayPath;
+
+static ITaskbarList3* _pTaskbarList = nullptr;   // careful, COM objects should only be accessed from apartment they are created in
+static intptr_t _setOverlayIconMemoryAddress = NULL;
+static uint64_t _iconCounter = 1; // Start with 1 so 0 can be the signal for no new message
+
+static UINT _dpiX; /* The horizontal dpi-size. Is set in Windows settings. Default 100% = 96 */
+static UINT _dpiY; /* The vertical dpi-size. Is set in Windows settings. Default 100% = 96 */
 
 // Functions from ReadRegister.asm
 extern "C" int64_t ReturnRdx();
@@ -62,12 +58,14 @@ extern "C" int64_t ReturnRdi();
 extern "C" int64_t ReturnR8();
 extern "C" int64_t ReturnR9();
 
+typedef HRESULT (STDAPICALLTYPE* GetDpiForMonitorFunc)(HMONITOR, MONITOR_DPI_TYPE, UINT*, UINT*);
+
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved);
 static DWORD WINAPI Init(LPVOID lpParam);
 static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 static void UpdateDpi(HWND hwnd);
 // NOTE: extern "C" is important to disable name-mangling, so that the functions can be found with GetProcAddress(), which is used in WhatsappTray.cpp
-extern "C" DLLIMPORT LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam); 
+extern "C" DLLIMPORT LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam);
 static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle);
 static std::string GetWindowTitle(HWND hwnd);
 static std::string GetFilepathFromProcessID(DWORD processId);
@@ -89,7 +87,7 @@ HRESULT DummyFunction();
 
 /**
  * @brief The entry point for the dll
- * 
+ *
  * This is called when the hook is attached to the thread
 */
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
@@ -97,7 +95,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	switch (fdwReason)
 	{
 	case DLL_PROCESS_ATTACH: {
-		
+
 		StartInitThread();
 
 		break;
@@ -181,7 +179,6 @@ DWORD WINAPI Init(LPVOID lpParam)
 		LogString("GetWhatsappTrayPath FAILED");
 		return 3;
 	}
-
 	LogString("_whatsappTrayPath=%s", _whatsappTrayPath.c_str());
 
 	HRESULT hrInit = CoInitialize(NULL);
@@ -196,14 +193,17 @@ DWORD WINAPI Init(LPVOID lpParam)
 	auto dummyFunctionAddr = (intptr_t)DummyFunction;
 	LogString("DummyFunction-adress=%llX.", DummyFunction);
 
-	WriteJumpToFunctionInVtable(iTaskbarList3Vtable, dummyFunctionAddr);
+	if (WriteJumpToFunctionInVtable(iTaskbarList3Vtable, dummyFunctionAddr) == false) {
+		LogString("WriteJumpToFunctionInVtable FAILED");
+		return 5;
+	}
 
 	return 0;
 }
 
 /**
  * @brief This is the new main window-proc. After we are done we call the original window-proc.
- * 
+ *
  * This method has the advantage over SetWindowsHookEx(WH_CALLWNDPROC... that here we can skip or modifie messages.
  */
 static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -220,46 +220,17 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 		// Compute the value for the TaskbarButtonCreated message
 		s_uTBBC = RegisterWindowMessage("TaskbarButtonCreated");
 
-		// Normally you should wait until you get the message s_uTBBC, but that does not always work.
+		// Normally you should wait until you get the message s_uTBBC, but that does not always work in this hook-dll.
 		// Maybe because Whatsapp already registerd, and the message was already received and Windows does not notify again
 		// So we just run it always on startup
+		// Look at this how it should normaly work: https://github.com/microsoft/Windows-classic-samples/tree/main/Samples/Win7Samples/winui/shell/appshellintegration/TaskbarPeripheralStatus
 		if (!_pTaskbarList) {
 			HRESULT hr = CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&_pTaskbarList));
 			if (SUCCEEDED(hr)) {
-				LogString("CoCreateInstance SUCCEEDED");
-
-
-
 				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-				LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-
-
 
 				hr = _pTaskbarList->HrInit();
 				if (FAILED(hr)) {
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
-					LogString("CoCreateInstance FAILED");
 					LogString("CoCreateInstance FAILED");
 
 					_pTaskbarList->Release();
@@ -270,63 +241,6 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 
 	}
 
-	//if (uMsg == s_uTBBC) {
-	//	LogString("TaskbarButtonCreated message received");
-	//	// Once we get the TaskbarButtonCreated message, we can call methods
-	//	// specific to our window on a TaskbarList instance. Note that it's
-	//	// possible this message can be received multiple times over the lifetime
-	//	// of this window (if explorer terminates and restarts, for example).
-	//	if (!_pTaskbarList) {
-	//		HRESULT hr = CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&_pTaskbarList));
-	//		if (SUCCEEDED(hr)) {
-	//			LogString("CoCreateInstance SUCCEEDED");
-
-
-
-	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-	//			LogString("CoCreateInstance SUCCEEDED %llX", _pTaskbarList);
-
-
-
-	//			hr = _pTaskbarList->HrInit();
-	//			if (FAILED(hr)) {
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-	//				LogString("CoCreateInstance FAILED");
-
-	//				_pTaskbarList->Release();
-	//				_pTaskbarList = NULL;
-	//			}
-	//		}
-	//	}
-	//}
-	
-	
-	
-	
-	
-	
 	std::ostringstream traceBuffer;
 
 #ifdef _DEBUG
@@ -457,8 +371,7 @@ static void UpdateDpi(HWND hwnd)
 	if (result != S_OK) {
 		LogString("Error when getting the dpi for WhatsApp");
 		// Continue even with the error...
-	}
-	else {
+	} else {
 		LogString("The dpi for WhatsApp is dpiX: %d dpiY: %d", _dpiX, _dpiY);
 	}
 
@@ -486,13 +399,13 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 
 /**
  * @brief Returns the window-handle for the window with the searched name in the current process
- * 
+ *
  * https://stackoverflow.com/questions/31384004/can-several-windows-be-bound-to-the-same-process
  * Windows are associated with threads.
  * Threads are associated with processes.
  * A thread can create as many top-level windows as it likes.
  * Therefore you can perfectly well have multiple top-level windows associated with the same thread.
- * @return 
+ * @return
 */
 static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle)
 {
@@ -506,13 +419,13 @@ static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle)
 		DWORD processId;
 		DWORD threadId = GetWindowThreadProcessId(iteratedHwnd, &processId);
 
-		// Check waTrayProcessId and Title
-		// Already observerd an instance where the waTrayProcessId alone lead to an false match!
+		// Check processId and Title
+		// Already observerd an instance where the processId alone lead to an false match!
 		if (_processID != processId) {
-			// waTrayProcessId does not match -> continue looking
+			// processId does not match -> continue looking
 			continue;
 		}
-		// Found matching waTrayProcessId
+		// Found matching processId
 
 		if (iteratedHwnd != GetAncestor(iteratedHwnd, GA_ROOT)) {
 			//LogString("Window is not a toplevel-window");
@@ -546,8 +459,8 @@ static std::string GetWindowTitle(HWND hwnd)
 
 /**
  * @brief Get the path to the executable for the ProcessID
- * 
- * @param waTrayProcessId The ProcessID from which the path to the executable should be fetched
+ *
+ * @param processId The ProcessID from which the path to the executable should be fetched
  * @return The path to the executable from the ProcessID
 */
 static std::string GetFilepathFromProcessID(DWORD processId)
@@ -604,7 +517,7 @@ static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam, LPARAM lParam
 /**
  * @brief Block the ShowWindow()-function so that WhatsApp can no longer call it.
  *        This is done because otherwise it messes with the start-minimized-feature of WhatsappTray
- * 
+ *
  *        Normaly WhatsApp calls ShowWindow() shortly before it is finished with initialization.
  */
 static bool BlockShowWindowFunction()
@@ -645,7 +558,7 @@ static bool BlockShowWindowFunction()
 
 /**
  * @brief Starts the hook-init in an seperate thread
- * 
+ *
  * Because it is better to not use DllMain for more complex initialisaition, a seperate thread will be created in this function.
  * NOTE: I had problems with '_processMessagesThread = std::thread(ProcessMessageQueue);' in WinSockClient, which would not run because of some limitations of DllMain
  * IMPORTANT: Don't wait for the thread to finish! This should not be done in DllMain...
@@ -699,21 +612,18 @@ bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR fileName)
 	WORD wBitCount;
 	if (iBits <= 1) {
 		wBitCount = 1;
-	}
-	else if (iBits <= 4) {
+	} else if (iBits <= 4) {
 		wBitCount = 4;
-	}
-	else if (iBits <= 8) {
+	} else if (iBits <= 8) {
 		wBitCount = 8;
-	}
-	else {
+	} else {
 		wBitCount = 24;
 	}
 
 	BITMAP bitmap;
 	GetObject(hBitmap, sizeof(bitmap), (LPSTR)&bitmap);
 
-	BITMAPINFOHEADER bi { 0 };
+	BITMAPINFOHEADER bi{ 0 };
 	bi.biSize = sizeof(BITMAPINFOHEADER);
 	bi.biWidth = bitmap.bmWidth;
 	bi.biHeight = -bitmap.bmHeight;
@@ -811,7 +721,7 @@ std::string GetWhatsappTrayPath()
 
 	// Remove the exe-filename so we get the folder
 	whatsappTrayPath = whatsappTrayPath.substr(0, whatsappTrayPath.find_last_of('\\'));
-	
+
 	return whatsappTrayPath;
 }
 
@@ -879,7 +789,7 @@ HRESULT DummyFunction()
 	// Get hicon-parameter
 	auto hIcon = (HICON)r8Value;
 	LogString("SetOverlayIcon() hicon-parameter=0x%llX (from r8-register)", hIcon);
-	
+
 	if (hIcon != NULL) {
 		LogString("New message(s)");
 
@@ -891,10 +801,9 @@ HRESULT DummyFunction()
 		// Notify WhatsappTray that a new bitmap(icon) is ready
 		SendMessageToWhatsappTray(WM_WHATSAPP_API_NEW_MESSAGE, _iconCounter, NULL);
 		_iconCounter++;
-	}
-	else {
+	} else {
 		LogString("No new messages");
-		
+
 		SendMessageToWhatsappTray(WM_WHATSAPP_API_NEW_MESSAGE, 0, NULL);
 	}
 
