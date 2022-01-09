@@ -36,14 +36,11 @@ static HWND _hwndWhatsapp = NULL; /* Handle to the window of WhatsApp */
 static HHOOK _hWndProc = NULL; /* Handle to the Hook from SetWindowsHookEx() */
 static HMODULE _hLib = NULL; /* Handle to the Hook.dll */
 
-static int _messagesSinceMinimize = 0;
-
 static char _loggerPort[] = LOGGER_PORT;
 static std::thread _winsockThread;
 
 static std::unique_ptr<TrayManager> _trayManager;
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd);
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static bool InitWhatsappTray();
 static HWND StartWhatsapp();
@@ -55,17 +52,20 @@ static bool SetHook();
 static void UnRegisterHook();
 static void SetLaunchOnWindowsStartupSetting(const bool value);
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
 	_hInstance = hInstance;
 
 	Logger::Setup();
 
-	// For reading data from *.lnk files (shortcut files). See Helper::ResolveLnk()
-	CoInitialize(nullptr);
-
 	LogInfo("Starting WhatsappTray %s in %s CompileConfiguration.", Helper::GetProductAndVersion().c_str(), CompileConfiguration);
 	LogInfo("CloseToTray=%d.", static_cast<bool>(AppData::CloseToTray.Get()));
+
+	// For reading data from *.lnk files (shortcut files). See Helper::ResolveLnk()
+	auto coInitRet = CoInitialize(nullptr);
+	if (FAILED(coInitRet)) {
+		LogInfo("The COM library was NOT initialized successfully");
+	}
 	
 	// Initialize WinSock-server, which is used to send log-messages from WhatsApp-hook to WhatsappTray
 	SocketNotifyOnNewMessage([](std::string message) {
@@ -260,14 +260,13 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 	} break;
 	case WM_WHATSAPP_API_NEW_MESSAGE: {
 
-		LogInfo("WM_WHATSAPP_API_NEW_MESSAGE");
-		_messagesSinceMinimize++;
+		LogInfo("WM_WHATSAPP_API_NEW_MESSAGE wparam=%d", wParam);
 
-		if (AppData::ShowUnreadMessages.Get()) {
-			char messagesSinceMinimizeBuffer[20] = { 0 };
-			snprintf(messagesSinceMinimizeBuffer, sizeof(messagesSinceMinimizeBuffer), "%d", _messagesSinceMinimize);
-			_trayManager->SetIcon(_hwndWhatsapp, messagesSinceMinimizeBuffer);
-		}
+		//if (AppData::ShowUnreadMessages.Get()) {
+
+		_trayManager->UpdateIcon(wParam);
+
+		//}
 
 	} break;
 	case WM_WHATSAPP_SHOWWINDOW_BLOCKED: {
@@ -376,7 +375,7 @@ static HWND StartWhatsapp()
 		Sleep(100);
 	}
 
-	LogInfo("WhatsApp-Window found.");
+	LogInfo("WhatsApp-Window found. hwnd=%X", _hwndWhatsapp);
 
 	return _hwndWhatsapp;
 }
@@ -619,4 +618,9 @@ static void SetLaunchOnWindowsStartupSetting(const bool value)
 	} else {
 		Registry::UnregisterProgram();
 	}
+}
+
+HWND GetWhatsAppHwnd()
+{
+	return _hwndWhatsapp;
 }

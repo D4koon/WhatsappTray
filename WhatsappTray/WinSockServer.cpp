@@ -71,7 +71,7 @@ static bool SocketDoProcessing(char portString[])
 
 	LogDebug("Listen to port successful.");
 
-	struct sockaddr_in clientAddress;
+	struct sockaddr_in clientAddress{};
 	int clientSize = sizeof(clientAddress);
 	while (true) {
 
@@ -133,7 +133,7 @@ static bool SetupSocket(char portString[])
 
 	LogDebug("socket() successful.");
 
-	struct sockaddr_in ServerAddress;
+	struct sockaddr_in ServerAddress{};
 	// Cleanup and Init with 0 the ServerAddress
 	ZeroMemory((char*)&ServerAddress, sizeof(ServerAddress));
 

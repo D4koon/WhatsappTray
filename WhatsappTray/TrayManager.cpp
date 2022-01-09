@@ -8,6 +8,7 @@
 #include "Logger.h"
 #include "WhatsappTray.h"
 #include "SharedDefines.h"
+#include <filesystem>
 
 using namespace Gdiplus;
 
@@ -58,25 +59,15 @@ void TrayManager::RegisterWindow(const HWND hwnd)
 	}
 
 	_hwndItems[newIndex] = hwnd;
-	CreateTrayIcon(newIndex, hwnd);
+	AddTrayIcon(newIndex, hwnd);
 }
 
-void TrayManager::CreateTrayIcon(const int32_t index, const HWND hwnd)
+void TrayManager::AddTrayIcon(const int32_t index, const HWND hwnd)
 {
-	Logger::Info(MODULE_NAME "CreateTrayIcon(%d)", index);
+	Logger::Info(MODULE_NAME "AddTrayIcon(%d)", index);
 
-	NOTIFYICONDATA nid;
-	ZeroMemory(&nid, sizeof(nid));
-	nid.cbSize = NOTIFYICONDATA_V2_SIZE;
-	nid.hWnd = _hwndWhatsappTray;
-	nid.uID = static_cast<UINT>(index);
-	nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
-	nid.uCallbackMessage = WM_TRAYCMD;
-	nid.hIcon = Helper::GetWindowIcon(hwnd);
+	auto nid = CreateTrayIconData(index, Helper::GetWindowIcon(hwnd));
 
-	GetWindowText(hwnd, nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
-
-	nid.uVersion = NOTIFYICON_VERSION;
 	Shell_NotifyIcon(NIM_ADD, &nid);
 	Shell_NotifyIcon(NIM_SETVERSION, &nid);
 }
@@ -111,8 +102,7 @@ void TrayManager::RemoveFromTray(const int32_t index)
 {
 	Logger::Info(MODULE_NAME "RemoveFromTray(%d)", index);
 
-	NOTIFYICONDATA nid;
-	ZeroMemory(&nid, sizeof(nid));
+	NOTIFYICONDATA nid { 0 };
 	nid.cbSize = NOTIFYICONDATA_V2_SIZE;
 	nid.hWnd = _hwndWhatsappTray;
 	nid.uID = (UINT)index;
@@ -141,30 +131,62 @@ void TrayManager::RestoreWindowFromTray(const HWND hwnd)
 	}
 }
 
-void TrayManager::SetIcon(const HWND hwnd, LPCSTR text)
+void TrayManager::UpdateIcon(uint64_t id)
 {
-	int32_t index = GetIndexFromWindowHandle(hwnd);
+	Logger::Info(MODULE_NAME "UpdateIcon() Use bitmap with id(%d)", id);
+
+	HICON waIcon = Helper::GetWindowIcon(GetWhatsAppHwnd());
+	auto trayIcon = waIcon;
+
+	if (id > 0) {
+		std::string appDirectory = Helper::GetApplicationDirectory();
+
+		// Delete old unread_messsages-bitmap
+		auto lastMessageCountBitmapPath = appDirectory + std::string("unread_messages_") + std::to_string(id - 1) + ".bmp";
+		if (std::filesystem::exists(lastMessageCountBitmapPath)) {
+			Logger::Info(MODULE_NAME "UpdateIcon() Deleting old unread_messages-bitmap '%s'", lastMessageCountBitmapPath.c_str());
+			std::filesystem::remove(lastMessageCountBitmapPath);
+		}
+
+		// Add the message-count-icon from WhatsApp to the normal icon
+		auto messageCountBitmapPath = appDirectory + std::string("unread_messages_") + std::to_string(id) + ".bmp";
+		if (std::filesystem::exists(messageCountBitmapPath) == false) {
+			Logger::Info(MODULE_NAME "UpdateIcon() Could not find message-count-bitmap in '%s'", messageCountBitmapPath.c_str());
+		} else {
+			trayIcon = AddImageOverlayToIcon(waIcon, messageCountBitmapPath.c_str());
+		}
+	}
+
+	auto index = GetIndexFromWindowHandle(GetWhatsAppHwnd());
 	if (index == -1) {
 		return;
 	}
 
-	HICON waIcon = Helper::GetWindowIcon(hwnd);
+	auto nid = CreateTrayIconData(index, trayIcon);
 
-	HICON iconWithText = AddTextToIcon(waIcon, text);
+	Shell_NotifyIcon(NIM_MODIFY, &nid);
 
-	NOTIFYICONDATA nid;
-	ZeroMemory(&nid, sizeof(nid));
+	if (id > 0) {
+		// Only destroy the icon when we created it (Through AddImageOverlayToIcon)
+		::DestroyIcon(trayIcon);
+	}
+}
+
+NOTIFYICONDATA TrayManager::CreateTrayIconData(const int32_t index, HICON trayIcon)
+{
+	Logger::Info(MODULE_NAME "CreateTrayIconData() With index=%d", index);
+
+	NOTIFYICONDATA nid{ 0 };
 	nid.cbSize = NOTIFYICONDATA_V2_SIZE;
 	nid.hWnd = _hwndWhatsappTray;
 	nid.uID = static_cast<UINT>(index);
 	nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
 	nid.uCallbackMessage = WM_TRAYCMD;
-	nid.hIcon = iconWithText;
-	GetWindowText(hwnd, nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]));
+	nid.hIcon = trayIcon;
 	nid.uVersion = NOTIFYICON_VERSION;
-	Shell_NotifyIcon(NIM_MODIFY, &nid);
+	strncpy_s(nid.szTip, ARRAYSIZE(nid.szTip), "WhatsApp", _TRUNCATE);
 
-	::DestroyIcon(iconWithText);
+	return nid;
 }
 
 int32_t TrayManager::GetIndexFromWindowHandle(const HWND hwnd)
@@ -182,50 +204,32 @@ int32_t TrayManager::GetIndexFromWindowHandle(const HWND hwnd)
 	return -1;
 }
 
-/**
- * Move into Helper-class?
- * NOTE:
- * I first tried this by only using gdi but since gdi has very limited support for transparency it would be very compliacted to do that.
- * When doing a TextOutA the alpha value gets overridden and the text is then transparent.
- * The solution is probably descibed here https://theartofdev.com/2013/10/24/transparent-text-rendering-with-gdi/ but is complicated.
- * I dont want to spent more time on it so im simply switch to gdi+ which can handle transparency
- * https://stackoverflow.com/questions/43393857/ <- has the problem described above.
- * Warning:
- * GDI+ has to be initialize to work. See WhatsappTray.cpp
- * There might be some GDI-memory leaks did not check to much.
-*/
-HICON TrayManager::AddTextToIcon(HICON hBackgroundIcon, LPCSTR text)
+HICON TrayManager::AddImageOverlayToIcon(HICON hBackgroundIcon, LPCSTR text)
 {
 	// Load up background icon
 	ICONINFO ii = { 0 };
 	//GetIconInfo creates bitmaps for the hbmMask and hbmColor members of ICONINFO.
-	//WARNING(TODO): The calling application must manage these bitmaps and delete them when they are no longer necessary.!!!!
+	//WARNING: The calling application must manage these bitmaps and delete them when they are no longer necessary.!!!!
 	::GetIconInfo(hBackgroundIcon, &ii);
-
-	//BITMAP bm;
-	//GetObject(ii.hbmColor, sizeof(BITMAP), &bm);
 
 	HDC hDc = ::GetDC(NULL);
 	HDC hMemDC = ::CreateCompatibleDC(hDc);
 
 	HGDIOBJ hOldBmp = ::SelectObject(hMemDC, ii.hbmColor);
-	//for (size_t i = 0; i < 32; i++) {
-	//	for (size_t y = 0; y < 32; y++) {
-	//		COLORREF pixelColor = GetPixel(hMemDC, i, y);
-	//		Logger::Info(MODULE_NAME "Pixelcolor: %X", pixelColor);
-	//	}
-	//}
+
+	auto bitmap = Bitmap::FromFile(Helper::Utf8ToWide(text).c_str());
 
 	Graphics graphics(hMemDC);
-	SolidBrush brush(Color(255, 255, 0, 0));
-	FontFamily fontFamily(L"Arial Black");
-	Font font(&fontFamily, 24, FontStyleBold, UnitPixel);
-	PointF pointF(3.0f, -1.5f);
-	if (strlen(text) >= 2) {
-		pointF = PointF(-6.0f, -1.5f);
-	}
 
-	graphics.DrawString(Helper::Utf8ToWide(text).c_str(), -1, &font, pointF, &brush);
+	// Set black as transparent (don't copy black pixels with DrawImage)
+	Gdiplus::ImageAttributes attr;
+	attr.SetColorKey(Gdiplus::Color::Black, Gdiplus::Color::Black, Gdiplus::ColorAdjustTypeBitmap);
+
+	// Set x/y-postion and size where the image should be copied to.
+	const Gdiplus::Rect rect(10, 10, 20, 20);
+	graphics.DrawImage(bitmap, rect, 0, 0, bitmap->GetWidth(), bitmap->GetHeight(), Gdiplus::Unit::UnitPixel, &attr);
+
+	delete bitmap;
 
 	::SelectObject(hMemDC, hOldBmp);
 

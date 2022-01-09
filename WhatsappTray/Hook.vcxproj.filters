@@ -28,4 +28,9 @@
       <Filter>Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <MASM Include="ReadRegister.asm">
+      <Filter>Files</Filter>
+    </MASM>
+  </ItemGroup>
 </Project>
