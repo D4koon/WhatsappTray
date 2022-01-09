@@ -9,12 +9,12 @@ class Registry
 {
 public:
 	static void RegisterProgram();
-	static bool RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args);
-	static bool IsMyProgramRegisteredForStartup(LPTSTR pszAppName);
+	static bool RegisterMyProgramForStartup(const TCHAR* pszAppName, TCHAR* pathToExe, TCHAR* args);
+	static bool IsMyProgramRegisteredForStartup(TCHAR* pszAppName);
 	static void UnregisterProgram();
 private:
 	Registry() { }
 	~Registry() { }
-	static const LPTSTR applicatinName;
+	static const TCHAR* applicatinName;
 };
 

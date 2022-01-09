@@ -10,7 +10,7 @@
 #include <tchar.h>
 #include <exception>
 
-const LPTSTR Registry::applicatinName = TEXT("WhatsappTray");
+const TCHAR* Registry::applicatinName = TEXT("WhatsappTray");
 
 /*
 * @brief Creates an entry in the registry to run WhatsappTray on startup.
@@ -28,7 +28,7 @@ void Registry::RegisterProgram()
 /*
 * @brief Creates an entry in the registry to run \p pszAppName on startup.
 */
-bool Registry::RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, LPTSTR args)
+bool Registry::RegisterMyProgramForStartup(const TCHAR* pszAppName, TCHAR* pathToExe, TCHAR* args)
 {
 	HKEY hKey = NULL;
 	LONG lResult = 0;
@@ -78,7 +78,7 @@ bool Registry::RegisterMyProgramForStartup(LPTSTR pszAppName, LPTSTR pathToExe, 
 /*
 * @brief Returns true if the autorun entry for WhatsappTray exists in the registry.
 */
-bool Registry::IsMyProgramRegisteredForStartup(LPTSTR pszAppName)
+bool Registry::IsMyProgramRegisteredForStartup(TCHAR* pszAppName)
 {
 	HKEY hKey = NULL;
 	LONG lResult = 0;

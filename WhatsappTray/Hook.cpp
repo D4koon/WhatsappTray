@@ -37,9 +37,10 @@ static HWND _whatsAppWindowHandle = NULL;
 static WNDPROC _originalWndProc = NULL;
 
 static ITaskbarList3* _pTaskbarList = nullptr;   // careful, COM objects should only be accessed from apartment they are created in
+static intptr_t _setOverlayIconMemoryAddress;
 
 static std::string _whatsappTrayPath;
-static uint32_t _iconCounter = 1; // Start with 1 so 0 can be the signal for no new message
+static uint64_t _iconCounter = 1; // Start with 1 so 0 can be the signal for no new message
 
 static UINT _dpiX; /* The horizontal dpi-size. Is set in Windows settings. Default 100% = 96 */
 static UINT _dpiY; /* The vertical dpi-size. Is set in Windows settings. Default 100% = 96 */
@@ -53,6 +54,13 @@ typedef enum MONITOR_DPI_TYPE {
 } MONITOR_DPI_TYPE;
 
 typedef HRESULT (STDAPICALLTYPE* GetDpiForMonitorFunc)(HMONITOR, MONITOR_DPI_TYPE, UINT*, UINT*);
+
+// Functions from ReadRegister.asm
+extern "C" int64_t ReturnRdx();
+extern "C" int64_t ReturnRcx();
+extern "C" int64_t ReturnRdi();
+extern "C" int64_t ReturnR8();
+extern "C" int64_t ReturnR9();
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved);
 static DWORD WINAPI Init(LPVOID lpParam);
@@ -71,20 +79,13 @@ static bool BlockShowWindowFunction();
 
 static void StartInitThread();
 
-
-extern "C" int ReturnRdx();
-extern "C" int ReturnRcx();
-extern "C" int ReturnRdi();
-extern "C" int ReturnR8();
-extern "C" int ReturnR9();
-
+bool SaveHIconToFile(HICON hIcon, std::string fileName);
 bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName);
-
 std::string GetWhatsappTrayPath();
-std::string GetTimestamp();
-intptr_t GetSetOverlayIconMemoryAddress();
-bool WriteJumpToFunction(PVOID address, char* pDummyFunctionAddr);
-void DummyFunction();
+intptr_t* GetITaskbarList3Vtable();
+intptr_t GetSetOverlayIconMemoryAddressFromVtable(intptr_t* iTaskbarList3_vtableAddress);
+bool WriteJumpToFunctionInVtable(intptr_t* iTaskbarList3_vtableAddress, intptr_t dummyFunctionAddr);
+HRESULT DummyFunction();
 
 /**
  * @brief The entry point for the dll
@@ -175,9 +176,6 @@ DWORD WINAPI Init(LPVOID lpParam)
 		SendMessageToWhatsappTray(WM_WHATSAPP_SHOWWINDOW_BLOCKED, 0, 0);
 	}
 
-
-
-
 	_whatsappTrayPath = GetWhatsappTrayPath();
 	if (_whatsappTrayPath.length() == 0) {
 		LogString("GetWhatsappTrayPath FAILED");
@@ -192,17 +190,13 @@ DWORD WINAPI Init(LPVOID lpParam)
 		return 4;
 	}
 
+	auto iTaskbarList3Vtable = GetITaskbarList3Vtable();
+	_setOverlayIconMemoryAddress = GetSetOverlayIconMemoryAddressFromVtable(iTaskbarList3Vtable);
+
 	auto dummyFunctionAddr = (intptr_t)DummyFunction;
-	auto pDummyFunctionAddr = (char*)&dummyFunctionAddr;
 	LogString("DummyFunction-adress=%llX.", DummyFunction);
-	LogString("Code= FF 25 00 00 00 00 %02hhX %02hhX %02hhX %02hhX %02hhX %02hhX %02hhX %02hhX", pDummyFunctionAddr[0], pDummyFunctionAddr[1], pDummyFunctionAddr[2], pDummyFunctionAddr[3], pDummyFunctionAddr[4], pDummyFunctionAddr[5], pDummyFunctionAddr[6], pDummyFunctionAddr[7]);
 
-	auto setOverlayIconMemoryAddress = (LPVOID)GetSetOverlayIconMemoryAddress();
-
-	// Write jump to dummy-function
-	if (WriteJumpToFunction(setOverlayIconMemoryAddress, pDummyFunctionAddr) == false) {
-		return 5;
-	}
+	WriteJumpToFunctionInVtable(iTaskbarList3Vtable, dummyFunctionAddr);
 
 	return 0;
 }
@@ -640,10 +634,10 @@ static bool BlockShowWindowFunction()
 
 	// Write 0xC3 to the first byte of the function
 	// This translate to a "RET"-command so the function will immediatly return instead of the normal jmp-command
-	*((INT8*)showWindowFunc) = 0xC3;
+	*((uint8_t*)showWindowFunc) = 0xC3;
 
 	// Read the first byte of the ShowWindow()-function to see that it has worked
-	auto showWindowFunc_FirstByte = *((INT8*)showWindowFunc);
+	auto showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
 	LogString("First byte of the ShowWindow()-function =0x%" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
 
 	return true;
@@ -676,9 +670,28 @@ void StartInitThread()
 	//CloseHandle(threadHandle);
 }
 
-bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName)
+bool SaveHIconToFile(HICON hIcon, std::string fileName)
 {
-	DWORD dwPaletteSize = 0, dwBmBitsSize = 0, dwDIBSize = 0;
+	ICONINFO picInfo;
+	auto infoRet = GetIconInfo(hIcon, &picInfo);
+	LogString("GetIconInfo-returnvalue=%d", infoRet);
+
+	BITMAP bitmap{};
+	auto getObjectRet = GetObject(picInfo.hbmColor, sizeof(bitmap), &bitmap);
+	LogString("getObjectRet=%d widht=%d height=%d", getObjectRet, bitmap.bmWidth, bitmap.bmHeight);
+
+	auto retValue = SaveHBITMAPToFile(picInfo.hbmColor, fileName.c_str());
+
+	// Clean up the data from GetIconInfo()
+	::DeleteObject(picInfo.hbmMask);
+	::DeleteObject(picInfo.hbmColor);
+
+	return retValue;
+}
+
+bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR fileName)
+{
+	DWORD dwPaletteSize = 0, dwDIBSize = 0;
 	HDC hDC = CreateDC(TEXT("DISPLAY"), NULL, NULL, NULL);
 	int iBits = GetDeviceCaps(hDC, BITSPIXEL) * GetDeviceCaps(hDC, PLANES);
 	DeleteDC(hDC);
@@ -700,7 +713,7 @@ bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName)
 	BITMAP bitmap;
 	GetObject(hBitmap, sizeof(bitmap), (LPSTR)&bitmap);
 
-	BITMAPINFOHEADER bi;
+	BITMAPINFOHEADER bi { 0 };
 	bi.biSize = sizeof(BITMAPINFOHEADER);
 	bi.biWidth = bitmap.bmWidth;
 	bi.biHeight = -bitmap.bmHeight;
@@ -712,10 +725,19 @@ bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName)
 	bi.biYPelsPerMeter = 0;
 	bi.biClrImportant = 0;
 	bi.biClrUsed = 256;
-	dwBmBitsSize = ((bitmap.bmWidth * wBitCount + 31) & ~31) / 8 * bitmap.bmHeight;
-	HANDLE hDib = GlobalAlloc(GHND, dwBmBitsSize + dwPaletteSize + sizeof(BITMAPINFOHEADER));
+	auto dwBmBitsSize = (((bitmap.bmWidth * wBitCount + 31) & ~31) / 8 * bitmap.bmHeight);
+	HANDLE hDib = GlobalAlloc(GHND, sizeof(BITMAPINFOHEADER) + dwBmBitsSize + dwPaletteSize);
+
+	if (hDib == NULL) {
+		LogString("hDib == NULL");
+		return false;
+	}
 
 	LPBITMAPINFOHEADER lpbi = (LPBITMAPINFOHEADER)GlobalLock(hDib);
+	if (lpbi == NULL) {
+		LogString("lpbi == NULL");
+		return false;
+	}
 	*lpbi = bi;
 
 	HANDLE hPal = GetStockObject(DEFAULT_PALETTE);
@@ -734,9 +756,10 @@ bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName)
 		ReleaseDC(NULL, hDC);
 	}
 
-	HANDLE fh = CreateFile(lpszFileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+	HANDLE fh = CreateFile(fileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 
 	if (fh == INVALID_HANDLE_VALUE) {
+		LogString("fh == INVALID_HANDLE_VALUE");
 		return false;
 	}
 
@@ -751,7 +774,7 @@ bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName)
 	DWORD bytesWritten;
 	WriteFile(fh, (LPSTR)&bmfHdr, sizeof(BITMAPFILEHEADER), &bytesWritten, NULL);
 	WriteFile(fh, (LPSTR)lpbi, dwDIBSize, &bytesWritten, NULL);
-	LogString("Icon was written to file-path=%s", lpszFileName);
+	LogString("Icon was written to file-path=%s", fileName);
 
 	GlobalUnlock(hDib);
 	GlobalFree(hDib);
@@ -792,25 +815,8 @@ std::string GetWhatsappTrayPath()
 	return whatsappTrayPath;
 }
 
-std::string GetTimestamp()
+intptr_t* GetITaskbarList3Vtable()
 {
-	std::string timestamp = "";
-
-	auto t = std::time(nullptr);
-	auto tm = *std::localtime(&t);
-
-	std::ostringstream oss;
-	oss << std::put_time(&tm, "%Y.%m.%d %H-%M-%S");
-	timestamp = oss.str();
-
-	LogString("timestamp=%s", timestamp.c_str());
-
-	return timestamp;
-}
-
-intptr_t GetSetOverlayIconMemoryAddress()
-{
-
 	HRESULT hr = CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&_pTaskbarList));
 	if (FAILED(hr)) {
 		LogString("CoCreateInstance FAILED");
@@ -823,91 +829,64 @@ intptr_t GetSetOverlayIconMemoryAddress()
 	//       but we only need the pointer to the _pTaskbarList to get to the vtable...
 	//       Normal usage can be seen here: https://github.com/microsoft/Windows-classic-samples/tree/main/Samples/Win7Samples/winui/shell/appshellintegration/TaskbarPeripheralStatus
 
-
 	auto iTaskbarList3_address = (intptr_t*)_pTaskbarList;
 	LogString("ITaskbarList3-class-address=0x%llX", iTaskbarList3_address);
 
 	auto iTaskbarList3_vtableAddress = (intptr_t*)iTaskbarList3_address[0];
 	LogString("iTaskbarList3_vtableAddress=0x%llX", iTaskbarList3_vtableAddress);
 
+	return iTaskbarList3_vtableAddress;
+}
+
+intptr_t GetSetOverlayIconMemoryAddressFromVtable(intptr_t* iTaskbarList3_vtableAddress)
+{
 	auto addressToSetOverlayIcon = iTaskbarList3_vtableAddress[18];
-	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
-	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
-	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
-	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
-	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
-	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
-	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
-	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
 	LogString("SetOverlayIcon address=0x%llX", addressToSetOverlayIcon);
 
 	return addressToSetOverlayIcon;
 }
 
 /**
- * @brief Write jump to dummy-function
- *        With the following bytes:
- *        FF 25 00 00 00 00 <dummyfunction-memory-address>
+ * @brief Write address of dummy-function to vtable of ITaskbarList3
 */
-bool WriteJumpToFunction(PVOID address, char* pDummyFunctionAddr)
+bool WriteJumpToFunctionInVtable(intptr_t* iTaskbarList3_vtableAddress, intptr_t dummyFunctionAddr)
 {
-	// Change the protection-level of this memory-region, because it normaly has read,execute
+	auto iTaskbarList3_vtableAddress_To_SetOverlayIcon = iTaskbarList3_vtableAddress + 18;
+
+	LogString("iTaskbarList3_vtableAddress_To_SetOverlayIcon=%llX", iTaskbarList3_vtableAddress_To_SetOverlayIcon);
+
+	// Change the protection-level of this memory-region, because it normaly has read, write, execute
 	// NOTE: If this is not done WhatsApp will crash!
 	DWORD oldProtect;
-	if (VirtualProtect(address, 20, PAGE_EXECUTE_READWRITE, &oldProtect) == NULL) {
-		LogString("Failed to change protection-level of memorysection for jump to dummyfunction");
+	if (VirtualProtect((PVOID)iTaskbarList3_vtableAddress_To_SetOverlayIcon, 8, PAGE_EXECUTE_READWRITE, &oldProtect) == NULL) {
+		LogString("Failed to change protection-level of memorysection for iTaskbarList3 v-table");
 		return false;
 	}
 
-	*(((UINT8*)address) + 0) = 0xFF;
-	*(((UINT8*)address) + 1) = 0x25;
-	*(((UINT8*)address) + 2) = 0x00;
-	*(((UINT8*)address) + 3) = 0x00;
-	*(((UINT8*)address) + 4) = 0x00;
-	*(((UINT8*)address) + 5) = 0x00;
-	*(((UINT8*)address) + 6) = pDummyFunctionAddr[0];
-	*(((UINT8*)address) + 7) = pDummyFunctionAddr[1];
-	*(((UINT8*)address) + 8) = pDummyFunctionAddr[2];
-	*(((UINT8*)address) + 9) = pDummyFunctionAddr[3];
-	*(((UINT8*)address) + 10) = pDummyFunctionAddr[4];
-	*(((UINT8*)address) + 11) = pDummyFunctionAddr[5];
-	*(((UINT8*)address) + 12) = pDummyFunctionAddr[6];
-	*(((UINT8*)address) + 13) = pDummyFunctionAddr[7];
+	// Write address of dummy-function to v-table
+	*(iTaskbarList3_vtableAddress_To_SetOverlayIcon) = dummyFunctionAddr;
 
 	return true;
 }
 
-void DummyFunction()
+HRESULT DummyFunction()
 {
 	// WARNING: The registers values have to be read before any other code is executed!
 	//          Otherwise it is likely that the values are overwritten
-	//auto rcxValue = ReturnRcx();
 	auto rdxValue = ReturnRdx();
-	//auto rdiValue = ReturnRdi();
 	auto r8Value = ReturnR8();
-	//auto r9Value = ReturnR9();
-
-	LogString("===DummyFunction-Called===");
 
 	// Get hicon-parameter
-	LogString("SetOverlayIcon() hicon-parameter=%llX (from r8-register)", r8Value);
-	// TODO: I think i have to clean up picInfo.hbmColor and the other bitmap, look in function description!!!
-	// TODO: I think i have to clean up picInfo.hbmColor and the other bitmap, look in function description!!!
-	// TODO: I think i have to clean up picInfo.hbmColor and the other bitmap, look in function description!!!
-	if (r8Value != NULL) {
+	auto hIcon = (HICON)r8Value;
+	LogString("SetOverlayIcon() hicon-parameter=0x%llX (from r8-register)", hIcon);
+	
+	if (hIcon != NULL) {
 		LogString("New message(s)");
-
-		ICONINFO picInfo;
-		auto infoRet = GetIconInfo((HICON)r8Value, &picInfo);
-		LogString("GetIconInfo-returnvalue=%d", infoRet);
-
-		BITMAP bitmap{};
-		auto getObjectRet = GetObject(picInfo.hbmColor, sizeof(bitmap), &bitmap);
-		LogString("getObjectRet=%d widht=%d height=%d", getObjectRet, bitmap.bmWidth, bitmap.bmHeight);
 
 		// Create new bitmaps for every function-call so to avoid errors due to race conditions
 		// Because the read from WhatsappTray is not synchronized with the writing from the hook.
-		SaveHBITMAPToFile(picInfo.hbmColor, (_whatsappTrayPath + std::string("\\unread_messages_") + std::to_string(_iconCounter) + ".bmp").c_str());
+		auto bitmap_path = _whatsappTrayPath + "\\unread_messages_" + std::to_string(_iconCounter) + ".bmp";
+		SaveHIconToFile(hIcon, bitmap_path.c_str());
 
 		// Notify WhatsappTray that a new bitmap(icon) is ready
 		SendMessageToWhatsappTray(WM_WHATSAPP_API_NEW_MESSAGE, _iconCounter, NULL);
@@ -921,7 +900,14 @@ void DummyFunction()
 
 	// Get hwnd-parameter
 	// NOTE: This should be the hwnd of the WhatsApp-Window
-	LogString("SetOverlayIcon() hwnd-parameter=%llX (from rdx-register)", rdxValue);
+	auto hwnd = (HWND)rdxValue;
+	LogString("SetOverlayIcon() hwnd-parameter=0x%llX (from rdx-register)", hwnd);
 
-	// TODO: Call the original function to get icon-overlay also in the taskbar
+	// Call the original function to get icon-overlay also in the taskbar
+	// NOTE: When the WhatsApp-window is removed from the taskbar (by minimize to tray), the overlay-icon will be removed.
+	//       This has nothing to do with this hack here.
+	LogString("_setOverlayIconMemoryAddress=0x%llX", _setOverlayIconMemoryAddress);
+	auto result = ((HRESULT(*)(ITaskbarList3*, HWND, HICON, LPCWSTR))_setOverlayIconMemoryAddress)(_pTaskbarList, hwnd, hIcon, NULL);
+
+	return result;
 }

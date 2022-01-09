@@ -79,8 +79,8 @@ public:
 		: Info(info)
 	{ }
 	const Data Info;
-	Serializeable* Value;
-	Serializeable* DefaultValue;
+	Serializeable* Value{};
+	Serializeable* DefaultValue{};
 };
 
 template<typename T>

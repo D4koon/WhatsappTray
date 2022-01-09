@@ -41,7 +41,6 @@ static std::thread _winsockThread;
 
 static std::unique_ptr<TrayManager> _trayManager;
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd);
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static bool InitWhatsappTray();
 static HWND StartWhatsapp();
@@ -53,17 +52,20 @@ static bool SetHook();
 static void UnRegisterHook();
 static void SetLaunchOnWindowsStartupSetting(const bool value);
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
 	_hInstance = hInstance;
 
 	Logger::Setup();
 
-	// For reading data from *.lnk files (shortcut files). See Helper::ResolveLnk()
-	CoInitialize(nullptr);
-
 	LogInfo("Starting WhatsappTray %s in %s CompileConfiguration.", Helper::GetProductAndVersion().c_str(), CompileConfiguration);
 	LogInfo("CloseToTray=%d.", static_cast<bool>(AppData::CloseToTray.Get()));
+
+	// For reading data from *.lnk files (shortcut files). See Helper::ResolveLnk()
+	auto coInitRet = CoInitialize(nullptr);
+	if (FAILED(coInitRet)) {
+		LogInfo("The COM library was NOT initialized successfully");
+	}
 	
 	// Initialize WinSock-server, which is used to send log-messages from WhatsApp-hook to WhatsappTray
 	SocketNotifyOnNewMessage([](std::string message) {
@@ -210,8 +212,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 				_trayManager->MinimizeWindowToTray(_hwndWhatsapp);
 			}
 		}
-
-		_trayManager->SetIcon(_hwndWhatsapp, "");
 	} break;
 	case WM_WHAHTSAPP_CLOSING: {
 		LogInfo("WM_WHAHTSAPP_CLOSING");
@@ -263,12 +263,9 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 		LogInfo("WM_WHATSAPP_API_NEW_MESSAGE wparam=%d", wParam);
 
 		//if (AppData::ShowUnreadMessages.Get()) {
-		if (wParam != 0) {
-			// New message(s)
-			_trayManager->SetIcon(_hwndWhatsapp, std::to_string(wParam).c_str());
-		} else {
-			_trayManager->SetIcon(_hwndWhatsapp, "");
-		}
+
+		_trayManager->UpdateIcon(wParam);
+
 		//}
 
 	} break;
@@ -621,4 +618,9 @@ static void SetLaunchOnWindowsStartupSetting(const bool value)
 	} else {
 		Registry::UnregisterProgram();
 	}
+}
+
+HWND GetWhatsAppHwnd()
+{
+	return _hwndWhatsapp;
 }
