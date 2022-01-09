@@ -11,6 +11,7 @@
 #include <string>
 #include <windows.h>
 #include <future>
+#include <thread>
 #include <psapi.h> // OpenProcess()
 #include <shobjidl.h>   // For ITaskbarList3
 //#include <shellscalingapi.h> // For dpi-scaling stuff
@@ -201,6 +202,9 @@ DWORD WINAPI Init(LPVOID lpParam)
 		return 5;
 	}
 
+	// This is a good point to see if WhatsApp is fully initialized, because it sets the overlay-icon very late in the init-process.
+	std::async(&OnWhatsAppFullyInitialized);
+
 	return 0;
 }
 
@@ -210,6 +214,8 @@ DWORD WINAPI Init(LPVOID lpParam)
 void OnWhatsAppFullyInitialized()
 {
 	LogString("WhatsAppFullyInitialized");
+
+	std::this_thread::sleep_for(std::chrono::seconds(5));
 
 	// It is no longer necessary to block the ShowWindow()-function, so unblock it again...
 	UnblockShowWindowFunction();
@@ -889,8 +895,5 @@ HRESULT Rerouted_SetOverlayIcon()
 	LogString("_setOverlayIconMemoryAddress=0x%llX", _setOverlayIconMemoryAddress);
 	auto result = ((HRESULT(*)(ITaskbarList3*, HWND, HICON, LPCWSTR))_setOverlayIconMemoryAddress)(_pTaskbarList, hwnd, hIcon, NULL);
 
-	// This is a good point to see if WhatsApp is fully initialized, because it sets the overlay-icon very late in the init-process.
-	std::async(&OnWhatsAppFullyInitialized);
-	
 	return result;
 }
