@@ -10,6 +10,7 @@
 #include <sstream>
 #include <string>
 #include <windows.h>
+#include <future>
 #include <psapi.h> // OpenProcess()
 #include <shobjidl.h>   // For ITaskbarList3
 //#include <shellscalingapi.h> // For dpi-scaling stuff
@@ -74,16 +75,18 @@ static std::string GetEnviromentVariable(const std::string& inputString);
 static POINT LParamToPoint(LPARAM lParam);
 static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam = 0, LPARAM lParam = 0);
 static bool BlockShowWindowFunction();
+static bool UnblockShowWindowFunction();
 
 static void StartInitThread();
+void OnWhatsAppFullyInitialized();
 
 bool SaveHIconToFile(HICON hIcon, std::string fileName);
 bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName);
 std::string GetWhatsappTrayPath();
 intptr_t* GetITaskbarList3Vtable();
 intptr_t GetSetOverlayIconMemoryAddressFromVtable(intptr_t* iTaskbarList3_vtableAddress);
-bool WriteJumpToFunctionInVtable(intptr_t* iTaskbarList3_vtableAddress, intptr_t dummyFunctionAddr);
-HRESULT DummyFunction();
+bool WriteJumpToFunctionInVtable(intptr_t* iTaskbarList3_vtableAddress, intptr_t Rerouted_SetOverlayIcon_Address);
+HRESULT Rerouted_SetOverlayIcon();
 
 /**
  * @brief The entry point for the dll
@@ -190,15 +193,26 @@ DWORD WINAPI Init(LPVOID lpParam)
 	auto iTaskbarList3Vtable = GetITaskbarList3Vtable();
 	_setOverlayIconMemoryAddress = GetSetOverlayIconMemoryAddressFromVtable(iTaskbarList3Vtable);
 
-	auto dummyFunctionAddr = (intptr_t)DummyFunction;
-	LogString("DummyFunction-adress=%llX.", DummyFunction);
+	auto Rerouted_SetOverlayIcon_Addr = (intptr_t)Rerouted_SetOverlayIcon;
+	LogString("Rerouted_SetOverlayIcon-address=%llX.", Rerouted_SetOverlayIcon);
 
-	if (WriteJumpToFunctionInVtable(iTaskbarList3Vtable, dummyFunctionAddr) == false) {
+	if (WriteJumpToFunctionInVtable(iTaskbarList3Vtable, Rerouted_SetOverlayIcon_Addr) == false) {
 		LogString("WriteJumpToFunctionInVtable FAILED");
 		return 5;
 	}
 
 	return 0;
+}
+
+/**
+ * @brief WhatsApp is fully initialized
+ */
+void OnWhatsAppFullyInitialized()
+{
+	LogString("WhatsAppFullyInitialized");
+
+	// It is no longer necessary to block the ShowWindow()-function, so unblock it again...
+	UnblockShowWindowFunction();
 }
 
 /**
@@ -519,6 +533,10 @@ static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam, LPARAM lParam
  *        This is done because otherwise it messes with the start-minimized-feature of WhatsappTray
  *
  *        Normaly WhatsApp calls ShowWindow() shortly before it is finished with initialization.
+ *			
+ * @warning This has some sideeffects, see issue 115 and 118
+ *          -> The context-menue in the textfield will be blocked and the SaveAs-dialog is broke, when for example trying to download some documents
+ *          -> Unblock as soon as it is no longer needed!
  */
 static bool BlockShowWindowFunction()
 {
@@ -545,13 +563,60 @@ static bool BlockShowWindowFunction()
 		return false;
 	}
 
-	// Write 0xC3 to the first byte of the function
+	// Read the first byte of the ShowWindow()-function
+	auto showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
+	LogString("First byte of the ShowWindow()-function =0X% (before change)" PRIx8 " NOTE: 0xFF is expected", showWindowFunc_FirstByte);
+
+	// Write 0xC3 to the first byte of the ShowWindow()-function
 	// This translate to a "RET"-command so the function will immediatly return instead of the normal jmp-command
 	*((uint8_t*)showWindowFunc) = 0xC3;
 
 	// Read the first byte of the ShowWindow()-function to see that it has worked
+	showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
+	LogString("First byte of the ShowWindow()-function =0X% (after change)" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
+
+	return true;
+}
+
+/**
+ * @brief Restore the ShowWindow()-function so that WhatsApp can call it again.
+ */
+static bool UnblockShowWindowFunction()
+{
+	// Get the User32.dll-handle
+	auto hLib = LoadLibrary("User32.dll");
+	if (hLib == NULL) {
+		LogString("Error loading User32.dll");
+		return false;
+	}
+	LogString("loading User32.dll finished");
+
+	// Get the address of the ShowWindow()-function of the User32.dll
+	auto showWindowFunc = (HOOKPROC)GetProcAddress(hLib, "ShowWindow");
+	if (showWindowFunc == NULL) {
+		LogString("The function 'ShowWindow' was NOT found");
+		return false;
+	}
+	LogString("The function 'ShowWindow' was NOT found (0x%" PRIx64 ")", showWindowFunc);
+
+	// Change the protection-level of this memory-region, because it normaly has read,execute
+	// NOTE: If this is not done WhatsApp will crash!
+	DWORD oldProtect;
+	if (VirtualProtect(showWindowFunc, 20, PAGE_EXECUTE_READWRITE, &oldProtect) == NULL) {
+		return false;
+	}
+
+	// Read the first byte of the ShowWindow()-function
 	auto showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-	LogString("First byte of the ShowWindow()-function =0x%" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
+	LogString("First byte of the ShowWindow()-function =0X% (before change)" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
+
+	// Write 0xFF to the first byte of the ShowWindow()-function
+	// This should restore the original function
+	*((uint8_t*)showWindowFunc) = 0xFF;
+
+	// Read the first byte of the ShowWindow()-function to see that it has worked
+	showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
+	LogString("First byte of the ShowWindow()-function =0X% (after change)" PRIx8 " NOTE: 0xFF is expected", showWindowFunc_FirstByte);
 
 	return true;
 }
@@ -583,6 +648,9 @@ void StartInitThread()
 	//CloseHandle(threadHandle);
 }
 
+/**
+ * @brief Save a HIcon to a file
+*/
 bool SaveHIconToFile(HICON hIcon, std::string fileName)
 {
 	ICONINFO picInfo;
@@ -602,6 +670,9 @@ bool SaveHIconToFile(HICON hIcon, std::string fileName)
 	return retValue;
 }
 
+/**
+ * @brief Save a HBitmap to a file
+*/
 bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR fileName)
 {
 	DWORD dwPaletteSize = 0, dwDIBSize = 0;
@@ -757,9 +828,9 @@ intptr_t GetSetOverlayIconMemoryAddressFromVtable(intptr_t* iTaskbarList3_vtable
 }
 
 /**
- * @brief Write address of dummy-function to vtable of ITaskbarList3
+ * @brief Write address of the Rerouted_SetOverlayIcon()-function to vtable of ITaskbarList3
 */
-bool WriteJumpToFunctionInVtable(intptr_t* iTaskbarList3_vtableAddress, intptr_t dummyFunctionAddr)
+bool WriteJumpToFunctionInVtable(intptr_t* iTaskbarList3_vtableAddress, intptr_t Rerouted_SetOverlayIcon_Address)
 {
 	auto iTaskbarList3_vtableAddress_To_SetOverlayIcon = iTaskbarList3_vtableAddress + 18;
 
@@ -773,13 +844,13 @@ bool WriteJumpToFunctionInVtable(intptr_t* iTaskbarList3_vtableAddress, intptr_t
 		return false;
 	}
 
-	// Write address of dummy-function to v-table
-	*(iTaskbarList3_vtableAddress_To_SetOverlayIcon) = dummyFunctionAddr;
+	// Write address of Rerouted_SetOverlayIcon()-function to v-table
+	*(iTaskbarList3_vtableAddress_To_SetOverlayIcon) = Rerouted_SetOverlayIcon_Address;
 
 	return true;
 }
 
-HRESULT DummyFunction()
+HRESULT Rerouted_SetOverlayIcon()
 {
 	// WARNING: The registers values have to be read before any other code is executed!
 	//          Otherwise it is likely that the values are overwritten
@@ -818,5 +889,8 @@ HRESULT DummyFunction()
 	LogString("_setOverlayIconMemoryAddress=0x%llX", _setOverlayIconMemoryAddress);
 	auto result = ((HRESULT(*)(ITaskbarList3*, HWND, HICON, LPCWSTR))_setOverlayIconMemoryAddress)(_pTaskbarList, hwnd, hIcon, NULL);
 
+	// This is a good point to see if WhatsApp is fully initialized, because it sets the overlay-icon very late in the init-process.
+	std::async(&OnWhatsAppFullyInitialized);
+	
 	return result;
 }
