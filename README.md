@@ -7,8 +7,9 @@ You can download that in the [WhatsApp Official Page](https://www.whatsapp.com/d
 
 ## Features:
 - Minimize/Close button sends WhatsApp window to tray
-- Esc key sens WhatsApp window to tray
 - Toggle WhatsApp window by clicking on the tray icon
+- Show unread messages in tray-icon
+- Esc key sends WhatsApp window to tray (optional)
 
 ## Configuration:
 WhatsappTray can be configured through:
@@ -21,15 +22,6 @@ By default WhatsappTray uses the shortcut that was created when WhatsApp was ins
 If you want to set a different path to the WhatsApp binary(exe), you can do so by using the 'WHATSAPP_STARTPATH' config in the appData.ini
 - *Absolute:* "WHATSAPP_STARTPATH=C:\Users\Dakoon\AppData\Local\WhatsApp\WhatsApp.exe"
 - *Relative to the folder in which WhatsappTray.exe lies:* "WHATSAPP_STARTPATH=.\..\WhatsApp.exe"
-- Support for variables *%UserProfile%* and *%AppData%*
-
-#### WHATSAPP_ROAMING_DIRECTORY
-For a portable config it is necessary to change the folder in which Whatsapp stores data.
-This directory is usually C:\Users\<username>\AppData\Roaming\WhatsApp\\IndexedDB\\file__0.indexeddb.leveldb
-This can be configured with the WHATSAPP_ROAMING_DIRECTORY config in the appData.ini
-The set path has to replace 'C:\Users\<username>\AppData\Roaming\'. This path has to contain the WhatsApp folder.
-- *Absolute:* "WHATSAPP_ROAMING_DIRECTORY=C:\Users\Dakoon\AppData\Roaming\
-- *Relative to the folder in which WhatsappTray.exe lies:* "WHATSAPP_ROAMING_DIRECTORY=.\..\WhatsApp.exe"
 - Support for variables *%UserProfile%* and *%AppData%*
 
 #### Other
