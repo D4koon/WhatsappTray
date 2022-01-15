@@ -53,6 +53,8 @@ static uint64_t _iconCounter = 1; // Start with 1 so 0 can be the signal for no 
 static UINT _dpiX; /* The horizontal dpi-size. Is set in Windows settings. Default 100% = 96 */
 static UINT _dpiY; /* The vertical dpi-size. Is set in Windows settings. Default 100% = 96 */
 
+static bool _showWindowFunctionIsBlocked = false;
+
 // Functions from ReadRegister.asm
 extern "C" int64_t ReturnRdx();
 extern "C" int64_t ReturnRcx();
@@ -320,6 +322,9 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 		LogString("Updating the Dpi");
 		UpdateDpi(_whatsAppWindowHandle);
 	} else if (uMsg == WM_LBUTTONUP) {
+		// Unblock ShowWindow()-function if a mouseclick is registered.
+		UnblockShowWindowFunction();
+
 		// Note x and y are clientare-coordiantes
 		auto clickPoint = LParamToPoint(lParam);
 		LogString("WM_LBUTTONUP received x=%d y=%d", clickPoint.x, clickPoint.y);
@@ -349,6 +354,9 @@ static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, L
 			LogString("Block WM_LBUTTONUP");
 			return 0;
 		}
+	} else if (uMsg == WM_RBUTTONUP) {
+		// Unblock ShowWindow()-function if a mouseclick is registered.
+		UnblockShowWindowFunction();
 	} else if (uMsg == WM_KEYUP) {
 		LogString("WM_KEYUP received key=%d", wParam);
 
@@ -581,6 +589,8 @@ static bool BlockShowWindowFunction()
 	showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
 	LogString("First byte of the ShowWindow()-function =0X% (after change)" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
 
+	_showWindowFunctionIsBlocked = true;
+
 	return true;
 }
 
@@ -589,40 +599,46 @@ static bool BlockShowWindowFunction()
  */
 static bool UnblockShowWindowFunction()
 {
-	// Get the User32.dll-handle
-	auto hLib = LoadLibrary("User32.dll");
-	if (hLib == NULL) {
-		LogString("Error loading User32.dll");
-		return false;
+	if (_showWindowFunctionIsBlocked == true) {
+		LogString("Unblock ShowWindow()-function");
+
+		// Get the User32.dll-handle
+		auto hLib = LoadLibrary("User32.dll");
+		if (hLib == NULL) {
+			LogString("Error loading User32.dll");
+			return false;
+		}
+		LogString("loading User32.dll finished");
+
+		// Get the address of the ShowWindow()-function of the User32.dll
+		auto showWindowFunc = (HOOKPROC)GetProcAddress(hLib, "ShowWindow");
+		if (showWindowFunc == NULL) {
+			LogString("The function 'ShowWindow' was NOT found");
+			return false;
+		}
+		LogString("The function 'ShowWindow' was NOT found (0x%" PRIx64 ")", showWindowFunc);
+
+		// Change the protection-level of this memory-region, because it normaly has read,execute
+		// NOTE: If this is not done WhatsApp will crash!
+		DWORD oldProtect;
+		if (VirtualProtect(showWindowFunc, 20, PAGE_EXECUTE_READWRITE, &oldProtect) == NULL) {
+			return false;
+		}
+
+		// Read the first byte of the ShowWindow()-function
+		auto showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
+		LogString("First byte of the ShowWindow()-function =0X% (before change)" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
+
+		// Write 0xFF to the first byte of the ShowWindow()-function
+		// This should restore the original function
+		*((uint8_t*)showWindowFunc) = 0xFF;
+
+		// Read the first byte of the ShowWindow()-function to see that it has worked
+		showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
+		LogString("First byte of the ShowWindow()-function =0X% (after change)" PRIx8 " NOTE: 0xFF is expected", showWindowFunc_FirstByte);
+	
+		_showWindowFunctionIsBlocked = false;
 	}
-	LogString("loading User32.dll finished");
-
-	// Get the address of the ShowWindow()-function of the User32.dll
-	auto showWindowFunc = (HOOKPROC)GetProcAddress(hLib, "ShowWindow");
-	if (showWindowFunc == NULL) {
-		LogString("The function 'ShowWindow' was NOT found");
-		return false;
-	}
-	LogString("The function 'ShowWindow' was NOT found (0x%" PRIx64 ")", showWindowFunc);
-
-	// Change the protection-level of this memory-region, because it normaly has read,execute
-	// NOTE: If this is not done WhatsApp will crash!
-	DWORD oldProtect;
-	if (VirtualProtect(showWindowFunc, 20, PAGE_EXECUTE_READWRITE, &oldProtect) == NULL) {
-		return false;
-	}
-
-	// Read the first byte of the ShowWindow()-function
-	auto showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-	LogString("First byte of the ShowWindow()-function =0X% (before change)" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
-
-	// Write 0xFF to the first byte of the ShowWindow()-function
-	// This should restore the original function
-	*((uint8_t*)showWindowFunc) = 0xFF;
-
-	// Read the first byte of the ShowWindow()-function to see that it has worked
-	showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-	LogString("First byte of the ShowWindow()-function =0X% (after change)" PRIx8 " NOTE: 0xFF is expected", showWindowFunc_FirstByte);
 
 	return true;
 }
