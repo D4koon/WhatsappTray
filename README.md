@@ -2,8 +2,9 @@
 Extension for the Whatsapp Desktop Client, that enables minimize-to-tray and close-to-tray functionality.
 
 ## Requirements:
-**WhatsApp Desktop Client**:
-You can download that in the [WhatsApp Official Page](https://www.whatsapp.com/download/)
+- **WhatsApp Desktop Client (64 bit)**:
+  - Download from the [Official WhatsApp Page](https://www.whatsapp.com/download/)
+- Windows 8 or higher
 
 ## Features:
 - Minimize/Close button sends WhatsApp window to tray
