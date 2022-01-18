@@ -375,7 +375,7 @@ static HWND StartWhatsapp()
 		Sleep(100);
 	}
 
-	LogInfo("WhatsApp-Window found. hwnd=%X", _hwndWhatsapp);
+	LogInfo("WhatsApp-Window found. hwnd=0x%X", _hwndWhatsapp);
 
 	return _hwndWhatsapp;
 }

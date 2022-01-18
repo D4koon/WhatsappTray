@@ -187,6 +187,7 @@ DWORD WINAPI Init(LPVOID lpParam)
 	}
 	LogString("_whatsappTrayPath=%s", _whatsappTrayPath.c_str());
 
+	// === Initialize iTaskbarList3-stuff to reroute SetOverlayIcon()-function ===
 	HRESULT hrInit = CoInitialize(NULL);
 	if (FAILED(hrInit)) {
 		LogString("CoInitialize FAILED");
@@ -568,7 +569,7 @@ static bool BlockShowWindowFunction()
 		LogString("The function 'ShowWindow' was NOT found");
 		return false;
 	}
-	LogString("The function 'ShowWindow' was NOT found (0x%" PRIx64 ")", showWindowFunc);
+	LogString("The function 'ShowWindow' was found (0x%" PRIx64 ")", showWindowFunc);
 
 	// Change the protection-level of this memory-region, because it normaly has read,execute
 	// NOTE: If this is not done WhatsApp will crash!
@@ -579,7 +580,7 @@ static bool BlockShowWindowFunction()
 
 	// Read the first byte of the ShowWindow()-function
 	auto showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-	LogString("First byte of the ShowWindow()-function =0X% (before change)" PRIx8 " NOTE: 0xFF is expected", showWindowFunc_FirstByte);
+	LogString("First byte of the ShowWindow()-function =0x%" PRIX8 " (before change) NOTE: 0xFF is expected", showWindowFunc_FirstByte);
 
 	// Write 0xC3 to the first byte of the ShowWindow()-function
 	// This translate to a "RET"-command so the function will immediatly return instead of the normal jmp-command
@@ -587,7 +588,7 @@ static bool BlockShowWindowFunction()
 
 	// Read the first byte of the ShowWindow()-function to see that it has worked
 	showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-	LogString("First byte of the ShowWindow()-function =0X% (after change)" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
+	LogString("First byte of the ShowWindow()-function =0x%" PRIX8 " (after change) NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
 
 	_showWindowFunctionIsBlocked = true;
 
@@ -616,7 +617,7 @@ static bool UnblockShowWindowFunction()
 			LogString("The function 'ShowWindow' was NOT found");
 			return false;
 		}
-		LogString("The function 'ShowWindow' was NOT found (0x%" PRIx64 ")", showWindowFunc);
+		LogString("The function 'ShowWindow' was found (0x%" PRIx64 ")", showWindowFunc);
 
 		// Change the protection-level of this memory-region, because it normaly has read,execute
 		// NOTE: If this is not done WhatsApp will crash!
@@ -627,7 +628,7 @@ static bool UnblockShowWindowFunction()
 
 		// Read the first byte of the ShowWindow()-function
 		auto showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-		LogString("First byte of the ShowWindow()-function =0X% (before change)" PRIx8 " NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
+		LogString("First byte of the ShowWindow()-function =0x%" PRIX8 " (before change) NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
 
 		// Write 0xFF to the first byte of the ShowWindow()-function
 		// This should restore the original function
@@ -635,7 +636,7 @@ static bool UnblockShowWindowFunction()
 
 		// Read the first byte of the ShowWindow()-function to see that it has worked
 		showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-		LogString("First byte of the ShowWindow()-function =0X% (after change)" PRIx8 " NOTE: 0xFF is expected", showWindowFunc_FirstByte);
+		LogString("First byte of the ShowWindow()-function =0x%" PRIX8 " (after change) NOTE: 0xFF is expected", showWindowFunc_FirstByte);
 	
 		_showWindowFunctionIsBlocked = false;
 	}
@@ -856,7 +857,7 @@ bool WriteJumpToFunctionInVtable(intptr_t* iTaskbarList3_vtableAddress, intptr_t
 {
 	auto iTaskbarList3_vtableAddress_To_SetOverlayIcon = iTaskbarList3_vtableAddress + 18;
 
-	LogString("iTaskbarList3_vtableAddress_To_SetOverlayIcon=%llX", iTaskbarList3_vtableAddress_To_SetOverlayIcon);
+	LogString("iTaskbarList3_vtableAddress_To_SetOverlayIcon=0x%llX", iTaskbarList3_vtableAddress_To_SetOverlayIcon);
 
 	// Change the protection-level of this memory-region, because it normaly has read, write, execute
 	// NOTE: If this is not done WhatsApp will crash!
