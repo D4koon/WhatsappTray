@@ -346,3 +346,45 @@ PROCESS_INFORMATION Helper::StartProcess(std::string exePath)
 
 	return pi;
 }
+
+
+/**
+ * @brief From https://stackoverflow.com/a/62371184/4870255
+*/
+WindowsOS Helper::GetOsVersionQuick()
+{
+	auto ntdllHandle = GetModuleHandleA("ntdll");
+	if (ntdllHandle == NULL) {
+		Logger::Info("Could not get module-handle for 'ntdll'");
+		Logger::Info("Windows could not be detected");
+		return WindowsOS::NotFind;
+	}
+
+	NTSTATUS(WINAPI * RtlGetVersion)(LPOSVERSIONINFOEXW);
+	*(FARPROC*)&RtlGetVersion = GetProcAddress(ntdllHandle, "RtlGetVersion");
+
+	double ret = 0.0;
+	OSVERSIONINFOEXW osInfo{};
+	if (NULL != RtlGetVersion) {
+		osInfo.dwOSVersionInfoSize = sizeof(osInfo);
+		RtlGetVersion(&osInfo);
+		ret = (double)osInfo.dwMajorVersion;
+	}
+
+	if (osInfo.dwMajorVersion == 10 && osInfo.dwMinorVersion == 0) {
+		Logger::Info("Windows 10 detected");
+		return WindowsOS::Win10;
+	} else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 3) {
+		Logger::Info("Windows 8.1 detected");
+		return WindowsOS::Win8;
+	} else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 2) {
+		Logger::Info("Windows 8 detected");
+		return WindowsOS::Win8;
+	} else if (osInfo.dwMajorVersion == 6 && osInfo.dwMinorVersion == 1) {
+		Logger::Info("Windows 7 or Windows Server 2008 R2 detected");
+		return WindowsOS::Win7;
+	}
+
+	Logger::Info("Windows could not be detected");
+	return WindowsOS::NotFind;
+}

@@ -59,6 +59,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	Logger::Setup();
 
 	LogInfo("Starting WhatsappTray %s in %s CompileConfiguration.", Helper::GetProductAndVersion().c_str(), CompileConfiguration);
+	Helper::GetOsVersionQuick();
 	LogInfo("CloseToTray=%d.", static_cast<bool>(AppData::CloseToTray.Get()));
 
 	// For reading data from *.lnk files (shortcut files). See Helper::ResolveLnk()
@@ -352,6 +353,8 @@ static HWND StartWhatsapp()
 	}
 
 	auto pi = Helper::StartProcess(waStartPathString);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
 
 	// We want to find the window-handle of WhatsApp
 	// - The hard thing here is to find the window-handle even if WhatsApp was already running when CreateProcess() was called.

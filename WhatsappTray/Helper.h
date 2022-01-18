@@ -9,6 +9,16 @@
 #include <windows.h>
 #include <string>
 
+enum class WindowsOS {
+	NotFind,
+	Win2000,
+	WinXP,
+	WinVista,
+	Win7,
+	Win8,
+	Win10
+};
+
 class Helper
 {
 public:
@@ -31,5 +41,5 @@ public:
 	static std::string GetFilepathFromProcessID(DWORD processId);
 	static std::string GetWindowTitle(const HWND hwnd);
 	static PROCESS_INFORMATION Helper::StartProcess(std::string exePath);
+	static WindowsOS GetOsVersionQuick();
 };
-
