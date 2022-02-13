@@ -4,6 +4,8 @@
 #include "SharedDefines.h"
 #include "WindowsMessage.h"
 #include "WinSockLogger.h"
+#include "ShowWindowMod.h"
+#include "HookHelper.h"
 
 #include "inttypes.h"
 #include <iostream>
@@ -53,8 +55,6 @@ static uint64_t _iconCounter = 1; // Start with 1 so 0 can be the signal for no 
 static UINT _dpiX; /* The horizontal dpi-size. Is set in Windows settings. Default 100% = 96 */
 static UINT _dpiY; /* The vertical dpi-size. Is set in Windows settings. Default 100% = 96 */
 
-static bool _showWindowFunctionIsBlocked = false;
-
 // Functions from ReadRegister.asm
 extern "C" int64_t ReturnRdx();
 extern "C" int64_t ReturnRcx();
@@ -66,25 +66,15 @@ typedef HRESULT (STDAPICALLTYPE* GetDpiForMonitorFunc)(HMONITOR, MONITOR_DPI_TYP
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved);
 static DWORD WINAPI Init(LPVOID lpParam);
+void OnWhatsAppFullyInitialized();
 static LRESULT APIENTRY RedirectedWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 static void UpdateDpi(HWND hwnd);
 // NOTE: extern "C" is important to disable name-mangling, so that the functions can be found with GetProcAddress(), which is used in WhatsappTray.cpp
 extern "C" DLLIMPORT LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam);
-static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle);
-static std::string GetWindowTitle(HWND hwnd);
-static std::string GetFilepathFromProcessID(DWORD processId);
-static std::string WideToUtf8(const std::wstring& inputString);
-static std::string GetEnviromentVariable(const std::string& inputString);
-static POINT LParamToPoint(LPARAM lParam);
 static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam = 0, LPARAM lParam = 0);
-static bool BlockShowWindowFunction();
-static bool UnblockShowWindowFunction();
 
 static void StartInitThread();
-void OnWhatsAppFullyInitialized();
 
-bool SaveHIconToFile(HICON hIcon, std::string fileName);
-bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR lpszFileName);
 std::string GetWhatsappTrayPath();
 intptr_t* GetITaskbarList3Vtable();
 intptr_t GetSetOverlayIconMemoryAddressFromVtable(intptr_t* iTaskbarList3_vtableAddress);
@@ -158,7 +148,7 @@ DWORD WINAPI Init(LPVOID lpParam)
 		return 1;
 	}
 
-	_whatsAppWindowHandle = GetTopLevelWindowhandleWithName(WHATSAPP_CLIENT_NAME);
+	_whatsAppWindowHandle = GetTopLevelWindowhandleWithName(WHATSAPP_CLIENT_NAME, _processID);
 	auto windowTitle = GetWindowTitle(_whatsAppWindowHandle);
 
 	LogString("Attached in window '%s' _whatsAppWindowHandle: 0x%08X", windowTitle.c_str(), _whatsAppWindowHandle);
@@ -176,6 +166,7 @@ DWORD WINAPI Init(LPVOID lpParam)
 	_originalWndProc = reinterpret_cast<WNDPROC>(SetWindowLongPtr(_whatsAppWindowHandle, GWLP_WNDPROC, (LONG_PTR)RedirectedWndProc));
 
 	if (BlockShowWindowFunction() == true) {
+		LogString("BlockShowWindowFunction() was successful");
 		// Notify WhatsAppTray that ShowWindow-function is blocked and the minmizing can be done if needed.
 		SendMessageToWhatsappTray(WM_WHATSAPP_SHOWWINDOW_BLOCKED, 0, 0);
 	}
@@ -205,8 +196,8 @@ DWORD WINAPI Init(LPVOID lpParam)
 		return 5;
 	}
 
-	// This is a good point to see if WhatsApp is fully initialized, because it sets the overlay-icon very late in the init-process.
-	std::async(&OnWhatsAppFullyInitialized);
+	// This is a good point to see if WhatsApp is fully initialized.
+	std::thread([]() { OnWhatsAppFullyInitialized(); }).detach();
 
 	return 0;
 }
@@ -218,7 +209,9 @@ void OnWhatsAppFullyInitialized()
 {
 	LogString("WhatsAppFullyInitialized");
 
-	std::this_thread::sleep_for(std::chrono::seconds(5));
+	auto wait_time_seconds = 5;
+	std::this_thread::sleep_for(std::chrono::seconds(wait_time_seconds));
+	LogString("Sleep for %d seconds is over", wait_time_seconds);
 
 	// It is no longer necessary to block the ShowWindow()-function, so unblock it again...
 	UnblockShowWindowFunction();
@@ -427,221 +420,11 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 }
 
 /**
- * @brief Returns the window-handle for the window with the searched name in the current process
- *
- * https://stackoverflow.com/questions/31384004/can-several-windows-be-bound-to-the-same-process
- * Windows are associated with threads.
- * Threads are associated with processes.
- * A thread can create as many top-level windows as it likes.
- * Therefore you can perfectly well have multiple top-level windows associated with the same thread.
- * @return
-*/
-static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle)
-{
-	HWND iteratedHwnd = NULL;
-	while (true) {
-		iteratedHwnd = FindWindowExA(NULL, iteratedHwnd, NULL, WHATSAPP_CLIENT_NAME);
-		if (iteratedHwnd == NULL) {
-			return NULL;
-		}
-
-		DWORD processId;
-		DWORD threadId = GetWindowThreadProcessId(iteratedHwnd, &processId);
-
-		// Check processId and Title
-		// Already observerd an instance where the processId alone lead to an false match!
-		if (_processID != processId) {
-			// processId does not match -> continue looking
-			continue;
-		}
-		// Found matching processId
-
-		if (iteratedHwnd != GetAncestor(iteratedHwnd, GA_ROOT)) {
-			//LogString("Window is not a toplevel-window");
-			continue;
-		}
-
-		auto windowTitle = GetWindowTitle(iteratedHwnd);
-		// Also check length because compare also matches strings that are longer like 'WhatsApp Voip'
-		if (windowTitle.compare(searchedWindowTitle) != 0 || windowTitle.length() != strlen(WHATSAPP_CLIENT_NAME)) {
-			//LogString("windowTitle='" + windowTitle + "' does not match '" WHATSAPP_CLIENT_NAME "'");
-			continue;
-		}
-
-		// Window handle found
-		break;
-	}
-
-	return iteratedHwnd;
-}
-
-/**
- * @brief Gets the text of a window.
- */
-static std::string GetWindowTitle(HWND hwnd)
-{
-	char windowNameBuffer[2000];
-	GetWindowTextA(hwnd, windowNameBuffer, sizeof(windowNameBuffer));
-
-	return std::string(windowNameBuffer);
-}
-
-/**
- * @brief Get the path to the executable for the ProcessID
- *
- * @param processId The ProcessID from which the path to the executable should be fetched
- * @return The path to the executable from the ProcessID
-*/
-static std::string GetFilepathFromProcessID(DWORD processId)
-{
-	HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
-	if (processHandle == NULL) {
-		return "";
-	}
-
-	wchar_t filepath[MAX_PATH];
-	if (GetModuleFileNameExW(processHandle, NULL, filepath, MAX_PATH) == 0) {
-		CloseHandle(processHandle);
-		return "";
-	}
-	CloseHandle(processHandle);
-
-	return WideToUtf8(filepath);
-}
-
-static std::string WideToUtf8(const std::wstring& inputString)
-{
-	int size_needed = WideCharToMultiByte(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), NULL, 0, NULL, NULL);
-	std::string strTo(size_needed, 0);
-	WideCharToMultiByte(CP_UTF8, 0, inputString.c_str(), (int)inputString.size(), &strTo[0], size_needed, NULL, NULL);
-	return strTo;
-}
-
-static std::string GetEnviromentVariable(const std::string& inputString)
-{
-	size_t requiredSize;
-	const size_t varbufferSize = 2000;
-	char varbuffer[varbufferSize];
-
-	getenv_s(&requiredSize, varbuffer, varbufferSize, inputString.c_str());
-
-	return varbuffer;
-}
-
-static POINT LParamToPoint(LPARAM lParam)
-{
-	POINT p = { LOWORD(lParam), HIWORD(lParam) };
-
-	return p;
-}
-
-/**
  * @brief Send message to WhatsappTray.
  */
 static bool SendMessageToWhatsappTray(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	return PostMessage(FindWindow(NAME, NAME), message, wParam, lParam);
-}
-
-/**
- * @brief Block the ShowWindow()-function so that WhatsApp can no longer call it.
- *        This is done because otherwise it messes with the start-minimized-feature of WhatsappTray
- *
- *        Normaly WhatsApp calls ShowWindow() shortly before it is finished with initialization.
- *			
- * @warning This has some sideeffects, see issue 115 and 118
- *          -> The context-menue in the textfield will be blocked and the SaveAs-dialog is broke, when for example trying to download some documents
- *          -> Unblock as soon as it is no longer needed!
- */
-static bool BlockShowWindowFunction()
-{
-	// Get the User32.dll-handle
-	auto hLib = LoadLibrary("User32.dll");
-	if (hLib == NULL) {
-		LogString("Error loading User32.dll");
-		return false;
-	}
-	LogString("loading User32.dll finished");
-
-	// Get the address of the ShowWindow()-function of the User32.dll
-	auto showWindowFunc = (HOOKPROC)GetProcAddress(hLib, "ShowWindow");
-	if (showWindowFunc == NULL) {
-		LogString("The function 'ShowWindow' was NOT found");
-		return false;
-	}
-	LogString("The function 'ShowWindow' was found (0x%" PRIx64 ")", showWindowFunc);
-
-	// Change the protection-level of this memory-region, because it normaly has read,execute
-	// NOTE: If this is not done WhatsApp will crash!
-	DWORD oldProtect;
-	if (VirtualProtect(showWindowFunc, 20, PAGE_EXECUTE_READWRITE, &oldProtect) == NULL) {
-		return false;
-	}
-
-	// Read the first byte of the ShowWindow()-function
-	auto showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-	LogString("First byte of the ShowWindow()-function =0x%" PRIX8 " (before change) NOTE: 0xFF is expected", showWindowFunc_FirstByte);
-
-	// Write 0xC3 to the first byte of the ShowWindow()-function
-	// This translate to a "RET"-command so the function will immediatly return instead of the normal jmp-command
-	*((uint8_t*)showWindowFunc) = 0xC3;
-
-	// Read the first byte of the ShowWindow()-function to see that it has worked
-	showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-	LogString("First byte of the ShowWindow()-function =0x%" PRIX8 " (after change) NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
-
-	_showWindowFunctionIsBlocked = true;
-
-	return true;
-}
-
-/**
- * @brief Restore the ShowWindow()-function so that WhatsApp can call it again.
- */
-static bool UnblockShowWindowFunction()
-{
-	if (_showWindowFunctionIsBlocked == true) {
-		LogString("Unblock ShowWindow()-function");
-
-		// Get the User32.dll-handle
-		auto hLib = LoadLibrary("User32.dll");
-		if (hLib == NULL) {
-			LogString("Error loading User32.dll");
-			return false;
-		}
-		LogString("loading User32.dll finished");
-
-		// Get the address of the ShowWindow()-function of the User32.dll
-		auto showWindowFunc = (HOOKPROC)GetProcAddress(hLib, "ShowWindow");
-		if (showWindowFunc == NULL) {
-			LogString("The function 'ShowWindow' was NOT found");
-			return false;
-		}
-		LogString("The function 'ShowWindow' was found (0x%" PRIx64 ")", showWindowFunc);
-
-		// Change the protection-level of this memory-region, because it normaly has read,execute
-		// NOTE: If this is not done WhatsApp will crash!
-		DWORD oldProtect;
-		if (VirtualProtect(showWindowFunc, 20, PAGE_EXECUTE_READWRITE, &oldProtect) == NULL) {
-			return false;
-		}
-
-		// Read the first byte of the ShowWindow()-function
-		auto showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-		LogString("First byte of the ShowWindow()-function =0x%" PRIX8 " (before change) NOTE: 0xC3 is expected", showWindowFunc_FirstByte);
-
-		// Write 0xFF to the first byte of the ShowWindow()-function
-		// This should restore the original function
-		*((uint8_t*)showWindowFunc) = 0xFF;
-
-		// Read the first byte of the ShowWindow()-function to see that it has worked
-		showWindowFunc_FirstByte = *((uint8_t*)showWindowFunc);
-		LogString("First byte of the ShowWindow()-function =0x%" PRIX8 " (after change) NOTE: 0xFF is expected", showWindowFunc_FirstByte);
-	
-		_showWindowFunctionIsBlocked = false;
-	}
-
-	return true;
 }
 
 /**
@@ -669,122 +452,6 @@ void StartInitThread()
 
 	// Close thread handle. NOTE(SAM): For now i do not clean up the thread handle because it shouldn't be such a big deal...
 	//CloseHandle(threadHandle);
-}
-
-/**
- * @brief Save a HIcon to a file
-*/
-bool SaveHIconToFile(HICON hIcon, std::string fileName)
-{
-	ICONINFO picInfo;
-	auto infoRet = GetIconInfo(hIcon, &picInfo);
-	LogString("GetIconInfo-returnvalue=%d", infoRet);
-
-	BITMAP bitmap{};
-	auto getObjectRet = GetObject(picInfo.hbmColor, sizeof(bitmap), &bitmap);
-	LogString("getObjectRet=%d widht=%d height=%d", getObjectRet, bitmap.bmWidth, bitmap.bmHeight);
-
-	auto retValue = SaveHBITMAPToFile(picInfo.hbmColor, fileName.c_str());
-
-	// Clean up the data from GetIconInfo()
-	::DeleteObject(picInfo.hbmMask);
-	::DeleteObject(picInfo.hbmColor);
-
-	return retValue;
-}
-
-/**
- * @brief Save a HBitmap to a file
-*/
-bool SaveHBITMAPToFile(HBITMAP hBitmap, LPCTSTR fileName)
-{
-	DWORD dwPaletteSize = 0, dwDIBSize = 0;
-	HDC hDC = CreateDC(TEXT("DISPLAY"), NULL, NULL, NULL);
-	int iBits = GetDeviceCaps(hDC, BITSPIXEL) * GetDeviceCaps(hDC, PLANES);
-	DeleteDC(hDC);
-
-	WORD wBitCount;
-	if (iBits <= 1) {
-		wBitCount = 1;
-	} else if (iBits <= 4) {
-		wBitCount = 4;
-	} else if (iBits <= 8) {
-		wBitCount = 8;
-	} else {
-		wBitCount = 24;
-	}
-
-	BITMAP bitmap;
-	GetObject(hBitmap, sizeof(bitmap), (LPSTR)&bitmap);
-
-	BITMAPINFOHEADER bi{ 0 };
-	bi.biSize = sizeof(BITMAPINFOHEADER);
-	bi.biWidth = bitmap.bmWidth;
-	bi.biHeight = -bitmap.bmHeight;
-	bi.biPlanes = 1;
-	bi.biBitCount = wBitCount;
-	bi.biCompression = BI_RGB;
-	bi.biSizeImage = 0;
-	bi.biXPelsPerMeter = 0;
-	bi.biYPelsPerMeter = 0;
-	bi.biClrImportant = 0;
-	bi.biClrUsed = 256;
-	auto dwBmBitsSize = (((bitmap.bmWidth * wBitCount + 31) & ~31) / 8 * bitmap.bmHeight);
-	HANDLE hDib = GlobalAlloc(GHND, sizeof(BITMAPINFOHEADER) + dwBmBitsSize + dwPaletteSize);
-
-	if (hDib == NULL) {
-		LogString("hDib == NULL");
-		return false;
-	}
-
-	LPBITMAPINFOHEADER lpbi = (LPBITMAPINFOHEADER)GlobalLock(hDib);
-	if (lpbi == NULL) {
-		LogString("lpbi == NULL");
-		return false;
-	}
-	*lpbi = bi;
-
-	HANDLE hPal = GetStockObject(DEFAULT_PALETTE);
-	HANDLE hOldPal2 = NULL;
-	if (hPal) {
-		hDC = GetDC(NULL);
-		hOldPal2 = SelectPalette(hDC, (HPALETTE)hPal, FALSE);
-		RealizePalette(hDC);
-	}
-
-	GetDIBits(hDC, hBitmap, 0, (UINT)bitmap.bmHeight, (LPSTR)lpbi + sizeof(BITMAPINFOHEADER) + dwPaletteSize, (BITMAPINFO*)lpbi, DIB_RGB_COLORS);
-
-	if (hOldPal2) {
-		SelectPalette(hDC, (HPALETTE)hOldPal2, TRUE);
-		RealizePalette(hDC);
-		ReleaseDC(NULL, hDC);
-	}
-
-	HANDLE fh = CreateFile(fileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-
-	if (fh == INVALID_HANDLE_VALUE) {
-		LogString("fh == INVALID_HANDLE_VALUE");
-		return false;
-	}
-
-	BITMAPFILEHEADER bmfHdr;
-	bmfHdr.bfType = 0x4D42; // "BM"
-	dwDIBSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + dwPaletteSize + dwBmBitsSize;
-	bmfHdr.bfSize = dwDIBSize;
-	bmfHdr.bfReserved1 = 0;
-	bmfHdr.bfReserved2 = 0;
-	bmfHdr.bfOffBits = (DWORD)sizeof(BITMAPFILEHEADER) + (DWORD)sizeof(BITMAPINFOHEADER) + dwPaletteSize;
-
-	DWORD bytesWritten;
-	WriteFile(fh, (LPSTR)&bmfHdr, sizeof(BITMAPFILEHEADER), &bytesWritten, NULL);
-	WriteFile(fh, (LPSTR)lpbi, dwDIBSize, &bytesWritten, NULL);
-	LogString("Icon was written to file-path=%s", fileName);
-
-	GlobalUnlock(hDib);
-	GlobalFree(hDib);
-	CloseHandle(fh);
-
-	return true;
 }
 
 std::string GetWhatsappTrayPath()

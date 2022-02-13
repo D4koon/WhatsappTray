@@ -5,6 +5,12 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
+    <Filter Include="ShowWindowMod">
+      <UniqueIdentifier>{e01bface-0375-436e-96cd-c3199df9e976}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HookHelper">
+      <UniqueIdentifier>{8e4525fd-71af-43ee-b089-fd2d68a52511}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Hook.cpp">
@@ -16,6 +22,12 @@
     <ClCompile Include="WinSockLogger.cpp">
       <Filter>Files</Filter>
     </ClCompile>
+    <ClCompile Include="ShowWindowMod.cpp">
+      <Filter>ShowWindowMod</Filter>
+    </ClCompile>
+    <ClCompile Include="HookHelper.cpp">
+      <Filter>HookHelper</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SharedDefines.h">
@@ -26,6 +38,12 @@
     </ClInclude>
     <ClInclude Include="WinSockLogger.h">
       <Filter>Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ShowWindowMod.h">
+      <Filter>ShowWindowMod</Filter>
+    </ClInclude>
+    <ClInclude Include="HookHelper.h">
+      <Filter>HookHelper</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "WinSockClient.h"
+#include "Helper.h"
 
 #include <string>
 #include <iostream>

@@ -2,6 +2,8 @@
 /* Copyright(C) 1998 - 2018 WhatsappTray Sebastian Amann */
 
 #pragma once
+#include "Helper.h"
+
 #include <fstream>
 #include <string>
 

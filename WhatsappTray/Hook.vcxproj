@@ -111,12 +111,16 @@
     </BuildLog>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="HookHelper.cpp" />
+    <ClCompile Include="ShowWindowMod.cpp" />
     <ClCompile Include="WinSockClient.cpp" />
     <ClCompile Include="Hook.cpp" />
     <ClCompile Include="WinSockLogger.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="HookHelper.h" />
     <ClInclude Include="SharedDefines.h" />
+    <ClInclude Include="ShowWindowMod.h" />
     <ClInclude Include="WinSockClient.h" />
     <ClInclude Include="WinSockLogger.h" />
   </ItemGroup>
