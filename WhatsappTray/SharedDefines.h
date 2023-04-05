@@ -5,6 +5,7 @@
 
 #define NAME TEXT("WhatsappTray")
 #define WHATSAPP_CLIENT_NAME TEXT("WhatsApp")
+#define WHATSAPP_OUTDATED_CLIENT_NAME TEXT("WhatsApp (Outdated)")
 #define WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR "WhatsappTrayLoadLibraryTest" /* The enviroment-variable used to test if the hook.dll was triggerd by WhatsappTray's LoadLibrary() */
 #define WHATSAPPTRAY_LOAD_LIBRARY_TEST_ENV_VAR_VALUE "TRUE" /* The value of the enviroment-variable used to test if the hook.dll was triggerd by WhatsappTray's LoadLibrary() */
 
