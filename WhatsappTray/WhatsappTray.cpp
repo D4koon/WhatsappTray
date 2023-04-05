@@ -389,11 +389,16 @@ static HWND StartWhatsapp()
  */
 static HWND FindWhatsappWindowHandle()
 {
-	HWND iteratedHwnd = NULL;
+	HWND iteratedHwnd = nullptr;
+	bool outdated = false;
 	while (true) {
-		iteratedHwnd = FindWindowExA(NULL, iteratedHwnd, NULL, WHATSAPP_CLIENT_NAME);
-		if (iteratedHwnd == NULL) {
-			return NULL;
+		iteratedHwnd = FindWindowExA(nullptr, iteratedHwnd, nullptr, WHATSAPP_CLIENT_NAME);
+		if (iteratedHwnd == nullptr) {
+			outdated = true;
+			iteratedHwnd = FindWindowExA(nullptr, iteratedHwnd, nullptr, WHATSAPP_OUTDATED_CLIENT_NAME);
+			if (iteratedHwnd == nullptr) {
+				return nullptr;
+			}
 		}
 
 		auto windowTitle = Helper::GetWindowTitle(iteratedHwnd);
@@ -408,7 +413,8 @@ static HWND FindWhatsappWindowHandle()
 		}
 
 		// Also check length because compare also matches strings that are longer like 'WhatsApp Voip'. Not sure if that is true but i leave it for now...
-		if (windowTitle.compare(WHATSAPP_CLIENT_NAME) != 0 && windowTitle.length() == strlen(WHATSAPP_CLIENT_NAME)) {
+		if (windowTitle.compare(outdated ? WHATSAPP_OUTDATED_CLIENT_NAME : WHATSAPP_CLIENT_NAME) != 0 && 
+			windowTitle.length() == strlen(outdated ? WHATSAPP_OUTDATED_CLIENT_NAME : WHATSAPP_CLIENT_NAME)) {
 			LogInfo("Window name does not match");
 			continue;
 		}

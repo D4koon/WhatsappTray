@@ -159,6 +159,12 @@ DWORD WINAPI Init(LPVOID lpParam)
 	}
 
 	_whatsAppWindowHandle = GetTopLevelWindowhandleWithName(WHATSAPP_CLIENT_NAME);
+	if(_whatsAppWindowHandle == nullptr)
+	{
+		LogString("WhatsApp window not found, checking for outdated version");
+		_whatsAppWindowHandle = GetTopLevelWindowhandleWithName(WHATSAPP_OUTDATED_CLIENT_NAME);
+	}
+
 	auto windowTitle = GetWindowTitle(_whatsAppWindowHandle);
 
 	LogString("Attached in window '%s' _whatsAppWindowHandle: 0x%08X", windowTitle.c_str(), _whatsAppWindowHandle);
@@ -437,11 +443,11 @@ LRESULT CALLBACK CallWndRetProc(int nCode, WPARAM wParam, LPARAM lParam)
 */
 static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle)
 {
-	HWND iteratedHwnd = NULL;
+	HWND iteratedHwnd = nullptr;
 	while (true) {
-		iteratedHwnd = FindWindowExA(NULL, iteratedHwnd, NULL, WHATSAPP_CLIENT_NAME);
-		if (iteratedHwnd == NULL) {
-			return NULL;
+		iteratedHwnd = FindWindowExA(nullptr, iteratedHwnd, nullptr, searchedWindowTitle.c_str());
+		if (iteratedHwnd == nullptr) {
+			return nullptr;
 		}
 
 		DWORD processId;
@@ -462,7 +468,7 @@ static HWND GetTopLevelWindowhandleWithName(std::string searchedWindowTitle)
 
 		auto windowTitle = GetWindowTitle(iteratedHwnd);
 		// Also check length because compare also matches strings that are longer like 'WhatsApp Voip'
-		if (windowTitle.compare(searchedWindowTitle) != 0 || windowTitle.length() != strlen(WHATSAPP_CLIENT_NAME)) {
+		if (windowTitle.compare(searchedWindowTitle) != 0 || windowTitle.length() != searchedWindowTitle.length()) {
 			//LogString("windowTitle='" + windowTitle + "' does not match '" WHATSAPP_CLIENT_NAME "'");
 			continue;
 		}
